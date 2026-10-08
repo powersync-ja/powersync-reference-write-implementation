@@ -1,4 +1,4 @@
-MANUAL TEST PLAN — PowerSync Write API
+MANUAL TEST PLAN — PowerSync Reference Write Implementation
 
 Run commands from the repository root unless stated otherwise. Use a disposable
 Postgres database and the local demo auth configuration. These checks do not require

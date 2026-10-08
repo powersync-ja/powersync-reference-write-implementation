@@ -1,4 +1,4 @@
-# PowerSync Write API
+# PowerSync Reference Write Implementation
 
 This backend accepts queued changes from a PowerSync client and writes them to your
 source database. PowerSync then syncs that database to clients.

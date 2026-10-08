@@ -1,4 +1,4 @@
-// PowerSync Write API connector
+// PowerSync Reference Write Implementation — single-file connector
 //
 // Copy this file into your app to upload queued transactions with plain fetch.
 // It requires @powersync/web or @powersync/react-native >=1.26.0 for getCrudTransactions().
