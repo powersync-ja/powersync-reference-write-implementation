@@ -1,0 +1,34 @@
+# Local AI-agent tooling and working notes. Personal to each clone — not part of the project.
+#
+# Project documentation stays tracked: CONTEXT.md (domain glossary), docs/adr/ (architecture
+# decisions) and docs/diagrams/ are shared, and committed code links to them.
+
+# Agent configuration and skill libraries
+.agents/
+.claude/
+skills-lock.json
+
+# Agent-facing conventions (issue tracker, triage labels, domain-doc layout)
+docs/agents/
+
+# Local issue tracker: specs, tickets and scratch notes
+.scratch/
+
+# Per-repo agent instructions
+CLAUDE.md
+
+test-system
+
+# Dependencies. Lockfiles stay tracked — the Dockerfiles install with --frozen-lockfile.
+node_modules/
+
+# PowerSync CLI exports contain deployment configuration and secret references.
+powersync-config*.json
+
+# This machine's overrides and secrets for Docker Compose (DATABASE_URI, ...); see docker-compose.yaml.
+# The committed .env holds shared defaults only.
+.env.local
+
+# Staging area for stuff cut from the repo (old demo app, per-DB examples, self-hosted config) —
+# kept locally for reference during the cleanup, never committed.
+archive/

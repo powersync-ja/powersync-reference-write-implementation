@@ -1,0 +1,234 @@
+openapi: 3.0.3
+info:
+  title: PowerSync Backend API
+  description: Contract between the demo app connector and the backend.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:6060
+    description: Local development
+
+paths:
+  /api/data:
+    post:
+      operationId: postTransactionBatch
+      summary: Apply one or more transactions, each in its own database transaction
+      security:
+        - bearerAuth: []
+      description: >
+        Applies each transaction in order, each in its own database transaction.
+        Stops at failures unless the backend BATCH_ON_FATAL_ERROR setting is skip and the failure is backend-directed.
+
+        To upload one transaction, send a transactions array containing one entry.
+
+        The results array contains one entry per transaction, in request order.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionBatch"
+      responses:
+        "200":
+          description: >
+            The batch was processed. Check each transaction status in results
+            for its outcome, including failures and transactions not attempted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionBatchResponse"
+        "400":
+          description: >
+            Request body failed validation, e.g. an empty batch or more
+            transactions than the declared maximum.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "401":
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "500":
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer JWT authenticating the writer to the backend.
+
+  schemas:
+    CrudTransaction:
+      type: object
+      required:
+        - crud
+      properties:
+        crud:
+          type: array
+          items:
+            $ref: "#/components/schemas/CrudEntry"
+        transaction_id:
+          type: integer
+          format: int64
+          description: Groups changes from the same transaction; null if no explicit transaction
+
+    CrudEntry:
+      type: object
+      required:
+        - id
+        - op
+        - table
+      properties:
+        id:
+          type: string
+          description: ID of the changed row
+        op:
+          type: string
+          enum:
+            - PUT
+            - PATCH
+            - DELETE
+          description: Type of change
+        table:
+          type: string
+          description: Table that contained the change
+        transaction_id:
+          type: integer
+          format: int64
+          description: Auto-incrementing transaction id
+        op_data:
+          type: object
+          additionalProperties: true
+          description: Data associated with the change
+        previous_values:
+          type: object
+          additionalProperties: true
+          description: Previous values for UPDATE/DELETE (when trackPreviousValues is enabled)
+        metadata:
+          type: string
+          description: Client-side metadata (when trackMetadata is enabled)
+
+    TransactionBatch:
+      type: object
+      required:
+        - transactions
+      properties:
+        transactions:
+          type: array
+          minItems: 1
+          maxItems: 50
+          description: >
+            Whole transactions to apply, in upload-queue order. A transaction is
+            never split across batches.
+          items:
+            $ref: "#/components/schemas/CrudTransaction"
+
+    TransactionBatchResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          description: >
+            One result per transaction sent, in the same order. Always the same
+            length as the transactions array in the request.
+          items:
+            $ref: "#/components/schemas/TransactionResponse"
+
+    TransactionResponse:
+      oneOf:
+        - $ref: "#/components/schemas/SuccessResult"
+        - $ref: "#/components/schemas/RetryableResult"
+        - $ref: "#/components/schemas/FatalResult"
+        - $ref: "#/components/schemas/NotAttemptedResult"
+      discriminator:
+        propertyName: status
+        mapping:
+          success: "#/components/schemas/SuccessResult"
+          retryable_error: "#/components/schemas/RetryableResult"
+          fatal_error: "#/components/schemas/FatalResult"
+          not_attempted: "#/components/schemas/NotAttemptedResult"
+
+    SuccessResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [success]
+
+    RetryableResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [retryable_error]
+        message:
+          type: string
+        retry_after_ms:
+          type: integer
+
+    NotAttemptedResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [not_attempted]
+
+    FatalResult:
+      type: object
+      required: [status, requires_client_handling, failed_operation]
+      properties:
+        status:
+          type: string
+          enum: [fatal_error]
+        requires_client_handling:
+          type: boolean
+          description: True retains the transaction pending an explicit client decision and always stops the batch.
+        failed_operation:
+          $ref: "#/components/schemas/FailedOperation"
+        message:
+          type: string
+
+    FailedOperation:
+      type: object
+      required: [error_code]
+      properties:
+        error_code:
+          type: string
+          description: >
+            Machine-readable classification, backend-specific.
+            CONSTRAINT_VIOLATION is a constraint the backend could not
+            identify more precisely; INVALID_DATA is a value that cannot be
+            stored in the column, e.g. malformed or out of range;
+            UNAUTHORIZED is a rejected authorization check;
+            UNCLASSIFIED_ERROR is an error the backend didn't recognize.
+        message:
+          type: string
+          description: Human-readable error detail.
+
+        details:
+          description: Application-defined JSON value; no application schema is imposed.
+        operation_index:
+          type: integer
+          minimum: 0
+          description: Zero-based index in the original transaction, omitted for transaction-level failures.
+
+    MessageResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string

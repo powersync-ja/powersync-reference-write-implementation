@@ -1,0 +1,47 @@
+# The write API, standalone. Assumes a hosted PowerSync instance and a database you already run —
+# this project owns neither. Set DATABASE_TYPE / DATABASE_URI in .env and export the instance's
+# auth config as described in backend/src/auth/SETUP.md.
+
+services:
+  backend:
+    build:
+      context: ./backend
+    # Bounded on purpose. A configuration error exits 1, and `unless-stopped` would respawn it
+    # forever, scrolling the message past. Three attempts still covers a transient crash.
+    restart: on-failure:3
+    # The backend's configuration comes from two files, later wins:
+    #   .env        committed, shared defaults
+    #   .env.local  gitignored and optional: this machine's overrides and secrets (DATABASE_URI, ...)
+    # Everything in them reaches the container, including the audience/issuer for the tokens this
+    # backend mints (POWERSYNC_URL, JWT_ISSUER), which must match what your PowerSync instance
+    # expects (its custom-auth settings), not PowerSync's own connection URL. Unset values fall back
+    # to the backend's own defaults (DATABASE_TYPE postgres, BATCH_ON_FATAL_ERROR stop).
+    # Do not list a variable under `environment:` below: it would override both files.
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.local
+        required: false
+    environment:
+      PORT: "6060"
+      POWERSYNC_CONFIG_PATH: /run/secrets/powersync-config.json
+    volumes:
+      - type: bind
+        source: ${POWERSYNC_CONFIG_PATH:-./backend/powersync-config.json}
+        target: /run/secrets/powersync-config.json
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      - "6060:6060"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:6060/').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
+        ]
+      interval: 5s
+      timeout: 2s
+      retries: 15

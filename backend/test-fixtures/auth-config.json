@@ -1,0 +1,7 @@
+{
+  "config": {
+    "client_auth": {
+      "jwks_uri": "https://test-auth.supabase.co/auth/v1/.well-known/jwks.json"
+    }
+  }
+}
