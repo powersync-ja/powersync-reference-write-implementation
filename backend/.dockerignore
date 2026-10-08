@@ -1,0 +1,20 @@
+# Without this, `COPY / ./` overwrites the node_modules installed in the image with the host's —
+# macOS-native binaries landing in a Linux container.
+node_modules
+
+# Secrets and local state must never reach the image.
+.env
+.envrc
+powersync-config*.json
+powersync/
+
+# Build and run artefacts.
+*.tsbuildinfo
+*.log
+dist
+
+# Not needed at runtime.
+Dockerfile
+.dockerignore
+**/*.test.ts
+test-fixtures/

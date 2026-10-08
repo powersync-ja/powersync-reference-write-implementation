@@ -1,0 +1,40 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "type": "module",
+  "author": "Mike Barnes <michael@journeyapps.com>",
+  "scripts": {
+    "start": "tsx index.ts",
+    "dev": "tsx watch index.ts",
+    "format": "prettier --write .",
+    "check": "tsc -b",
+    "test": "vitest run",
+    "generate-types": "openapi-typescript ./powersync-reference-write-api.openapi.yaml -o src/generated/api.ts && openapi-typescript ./powersync-reference-write-api.openapi.yaml -o ../example-client/src/generated/api.d.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-openapi-validator": "^5.6.2",
+    "jose": "^6.2.0",
+    "mongodb": "^6.9.0",
+    "mssql": "^12.1.0",
+    "mysql2": "^3.11.3",
+    "pg": "^8.11.3",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/mssql": "^9.1.8",
+    "@types/node": "^22.7.5",
+    "@types/pg": "^8.20.0",
+    "@types/supertest": "^7.2.1",
+    "openapi-typescript": "^7.13.0",
+    "prettier": "^3.2.4",
+    "supertest": "^7.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.2",
+    "vitest": "^4.1.10"
+  },
+  "packageManager": "pnpm@9.12.3+sha512.cce0f9de9c5a7c95bef944169cc5dfe8741abfb145078c0d508b868056848a87c81e626246cb60967cbd7fd29a6c062ef73ff840d96b3c86c40ac92cf4a813ee"
+}

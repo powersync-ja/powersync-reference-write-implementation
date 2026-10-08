@@ -1,0 +1,269 @@
+MANUAL TEST PLAN — PowerSync Write API
+
+Run commands from the repository root unless stated otherwise. Use a disposable
+Postgres database and the local demo auth configuration. These checks do not require
+a PowerSync instance; they do not test replication or client sync.
+
+Record your starting git status and preserve any existing local changes. The steps
+below edit .env (or .env.local) and the AUTH_* supplements. Restore only the changes made for this test.
+
+Prerequisites: Docker Desktop, Node.js 24, pnpm 9, curl, and Python 3.
+Select Node 24 explicitly; backend/.nvmrc currently pins an older version.
+
+[ ] Install backend dependencies:
+
+        pnpm --dir backend install
+
+[ ] Stop any existing backend on port 6060 and confirm the port is free:
+
+        lsof -nP -iTCP:6060 -sTCP:LISTEN
+
+
+1. INITIAL STARTUP
+
+[ ] From a fresh configuration with no backend/powersync-config.json, run:
+
+        docker compose up --build
+
+    Expected: Compose rejects the missing bind source. It cannot start the backend
+    until the auth file exists. If you already have an auth export, preserve it and
+    skip this check. Do not overwrite an existing deployment configuration.
+
+[ ] Stop the Compose project before continuing:
+
+        docker compose down
+
+
+2. TEST DATABASE
+
+[ ] Start a separate Postgres container:
+
+        docker run -d --name adopter-db -p 5433:5432 \
+          -e POSTGRES_PASSWORD=adopterpw -e POSTGRES_DB=adopter postgres:18
+
+[ ] Wait until this reports that connections are accepted:
+
+        docker exec adopter-db pg_isready -U postgres -d adopter
+
+[ ] Create the table:
+
+        docker exec adopter-db psql -U postgres -d adopter -c \
+          'CREATE TABLE widgets (id uuid PRIMARY KEY, name text NOT NULL)'
+
+    Expected: CREATE TABLE. Replication publications are unnecessary for these
+    write-only checks. A full sync test needs separate PowerSync source setup.
+
+
+3. DATABASE AND AUTH CONFIGURATION
+
+[ ] Set these values in the root .env used by Compose:
+
+        DATABASE_TYPE=postgres
+        DATABASE_URI=postgres://postgres:adopterpw@host.docker.internal:5433/adopter
+        BATCH_ON_FATAL_ERROR=stop
+
+    Use Docker Desktop's host.docker.internal here. Other Docker environments need
+    an equivalent host address. Leave POWERSYNC_CONFIG_PATH unset to use the default.
+
+[ ] Generate signing keys and copy both printed values into the root .env:
+
+        pnpm --dir backend generate-keys
+
+[ ] Follow backend/src/auth/SETUP.md, "Local demo authentication":
+    - Create backend/powersync-config.json with the loopback JWKS URL.
+    - Set AUTH_ISSUER, AUTH_AUDIENCE, and AUTH_ALLOW_LOCAL_HTTP in the environment file.
+    - Use the powersync-dev issuer and audience shown above.
+
+    Remote keys are fetched after the API starts, so the loopback JWKS does not
+    require a second server or a pre-existing token.
+
+[ ] Start the backend with the updated code and settings:
+
+        docker compose up -d --build
+        docker compose logs backend
+        curl -s http://localhost:6060/
+
+    Expected: startup log and {"message":"backend"}, without a restart loop.
+
+
+4. WRITES AND FAILURE RESULTS
+
+[ ] Sign in as a test user with your provider and copy its session token:
+
+        TOKEN='paste-a-current-token-here'
+
+    Do not publish the token.
+
+[ ] Write a row:
+
+        curl -s -X POST http://localhost:6060/api/data \
+          -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+          -d '{"transactions":[{"crud":[{"op":"PUT","table":"widgets","id":"11111111-1111-1111-1111-111111111111","op_data":{"name":"manual test row"}}]}]}'
+
+    Expected: {"results":[{"status":"success"}]}.
+
+        docker exec adopter-db psql -U postgres -d adopter -c 'SELECT * FROM widgets'
+
+    Expected: the inserted row.
+
+[ ] Send a malformed body with a bearer header:
+
+        curl -i -X POST http://localhost:6060/api/data \
+          -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+          -d '{"transactions":"not-an-array"}'
+
+    Expected: HTTP 400.
+
+[ ] Test authentication using a valid body and no bearer header:
+
+        curl -i -X POST http://localhost:6060/api/data \
+          -H 'Content-Type: application/json' -d '{"transactions":[{"crud":[]}]}'
+
+    Expected: HTTP 401. Repeat with "Authorization: Bearer invalid" and the same body.
+    Using an invalid body would mix request-validation and authentication failures.
+
+[ ] Confirm that a failed operation rolls back its whole transaction:
+
+        curl -s -X POST http://localhost:6060/api/data \
+          -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+          -d '{"transactions":[{"crud":[{"op":"PUT","table":"widgets","id":"22222222-2222-2222-2222-222222222222","op_data":{"name":"rolled back"}},{"op":"PUT","table":"widgets","id":"33333333-3333-3333-3333-333333333333","op_data":{"name":null}}]},{"crud":[]}]}'
+
+    Expected: HTTP 200 with first result fatal_error, requires_client_handling false,
+    error_code NOT_NULL_VIOLATION, and operation_index 1. The second result is
+    not_attempted because BATCH_ON_FATAL_ERROR=stop. The default handler logs a dead letter.
+
+        docker exec adopter-db psql -U postgres -d adopter -c 'SELECT * FROM widgets'
+
+    Expected: only the original row; neither row from the failed transaction exists.
+
+[ ] Set BATCH_ON_FATAL_ERROR=skip in the root .env, then recreate the container:
+
+        docker compose up -d --force-recreate backend
+
+    Repeat the failed batch above. Expected: the first result is still fatal_error;
+    the second result is success. Restore stop and recreate the container afterwards.
+    A container restart alone does not reload changed Compose environment values.
+
+[ ] Confirm the default authorizer permits another user to delete the original row:
+
+        TOKEN2='paste-a-token-for-a-second-user'
+        curl -s -X POST http://localhost:6060/api/data \
+          -H "Authorization: Bearer $TOKEN2" -H 'Content-Type: application/json' \
+          -d '{"transactions":[{"crud":[{"op":"DELETE","table":"widgets","id":"11111111-1111-1111-1111-111111111111"}]}]}'
+
+    Expected: success and an empty widgets table. This verifies the default behavior;
+    application-specific authorization or RLS changes the expected result.
+
+[ ] Stop the backend:
+
+        docker compose down
+
+
+5. EXAMPLE CLIENT REFERENCES
+
+[ ] Confirm the files described in example-client/README.md exist:
+
+        find example-client/src -type f | sort
+
+    Include the connector maintenance prompt when comparing the complete file list.
+
+[ ] Confirm the single-file connector has one import, from @powersync/web:
+
+        rg '^import' example-client/src/PowersyncConnector.singlefile.ts
+
+[ ] Check both connectors in your own PowerSync application using the client guide.
+    Configure authentication and the real sync URL; the HTTP-only setup above does
+    not establish a sync connection. Compare successful uploads, retained failures,
+    token refresh, and the intended client UI for onFatalTransaction.
+
+
+6. DEVELOPMENT RUN MODES
+
+[ ] Start the Docker development overlay:
+
+        docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up --build
+
+    In another terminal, temporarily change backend/app.ts's root response message.
+    Expected: tsx reloads and curl http://localhost:6060/ returns the changed message.
+    Restore the original response and confirm it reloads again.
+
+[ ] Stop the overlay:
+
+        docker compose -f docker-compose.yaml -f docker-compose.dev.yaml down
+
+[ ] Check the image build path with plain docker compose up -d --build.
+    A source edit should not appear after docker compose restart backend.
+    Rebuild with docker compose up -d --build backend to include it.
+    Restore your test edit, rebuild, and stop the backend.
+
+[ ] For local execution, create backend/.env from backend/.env.template.
+    Copy the signing settings from the root .env and use the same auth file and
+    supplements. Change DATABASE_URI to postgres://postgres:adopterpw@localhost:5433/adopter.
+
+        pnpm --dir backend dev
+
+    Expected: root route and authenticated requests work. The process loads
+    backend/.env, not the root .env. Stop it before restarting Compose.
+
+
+7. GENERATED TYPES
+
+[ ] Regenerate the types:
+
+        pnpm --dir backend generate-types
+        git diff -- backend/src/generated/api.ts example-client/src/generated/api.d.ts
+
+    Expected: generation introduces no additional differences from your starting tree.
+    The single-file connector's types are maintained separately; follow its maintenance prompt.
+
+
+8. AUTOMATED CHECKS
+
+[ ] With Node.js 24 selected, run:
+
+        pnpm --dir backend test
+        pnpm --dir backend check
+
+    Expected: tests and type checking pass. Tests use fixtures and mocks, but the HTTP
+    tests need permission to open local listening ports.
+
+
+9. STARTUP AND KEY FAILURES
+
+Use the configured test environment. Restore each setting after its check, and use
+force-recreate for environment changes. Keep the required auth file mounted.
+
+[ ] Blank DATABASE_URI in the root .env and recreate the container.
+    Expected: Cannot start. with instructions to set DATABASE_URI. Restart policy
+    on-failure:3 limits automatic retries to three after the initial failed start.
+
+[ ] Restore the URI and set DATABASE_TYPE=postgresql; recreate the container.
+    Expected: unsupported type, with mongodb, mssql, mysql, postgres listed.
+
+[ ] Set BATCH_ON_FATAL_ERROR=continue; recreate the container.
+    Expected: instructions to choose stop or skip.
+
+[ ] Supply malformed auth JSON in a separate powersync-config-test.json file and
+    point POWERSYNC_CONFIG_PATH at its absolute host path; recreate the container.
+    Expected: Cannot start. with an invalid-JSON message. Restore the original path.
+
+[ ] Confirm the backend does not issue tokens:
+
+        curl -i http://localhost:6060/api/auth/token
+
+    Expected: HTTP 404.
+
+
+TEARDOWN
+
+[ ] Remove this test's containers and volumes:
+
+        docker compose down -v --remove-orphans
+        docker rm -f adopter-db
+
+[ ] Restore the environment settings (including AUTH_* supplements) and auth file changed for
+    this test. Preserve any earlier local work. Remove only temporary files you created.
+
+[ ] Record untested paths or unexpected results below.
+
+Section    Expected behavior    Actual behavior    Follow-up

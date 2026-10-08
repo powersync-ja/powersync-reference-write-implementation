@@ -1,0 +1,16 @@
+# Development overlay: edit backend code and see it running in seconds, with no image rebuild.
+#
+#   COMPOSE_FILE=docker-compose.yaml:docker-compose.dev.yaml
+#
+# Or skip Docker for the backend entirely and run `pnpm dev` on the host.
+
+services:
+  backend:
+    # tsx watch, already in the backend's scripts — restarts on save.
+    command: ["pnpm", "dev"]
+    volumes:
+      # Your working tree, live in the container.
+      - ./backend:/app
+      # Keeps the image's Linux node_modules. Without this the bind mount above shadows them with
+      # the host's, which on macOS means native binaries the container cannot run.
+      - /app/node_modules
