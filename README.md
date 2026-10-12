@@ -135,4 +135,4 @@ but no Docker, running database, or live identity provider. Type generation upda
 `backend/src/generated/api.ts` and `example-client/src/generated/api.d.ts` from the OpenAPI
 spec. Run it after editing the spec.
 
-[The manual checklist](docs/test.txt) provides a separate Postgres test setup.
+[The manual checklist](docs/manual-test-plan.md) provides a separate Postgres test setup.
