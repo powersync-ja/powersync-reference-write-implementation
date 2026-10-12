@@ -1,11 +1,18 @@
 # PowerSync Reference Write Implementation
 
-This backend accepts queued changes from a PowerSync client and writes them to your
-source database. PowerSync then syncs that database to clients.
+When your PowerSync-enabled front-end app writes data using SQL INSERT, UPDATE, or DELETE statements,
+PowerSync automatically queues these mutations for processing using the `uploadData` function.
 
-The repository includes an Express API, adapters for Postgres, MongoDB, MySQL, and
-SQL Server, and reference TypeScript connectors. You supply the database, PowerSync
-instance, client application, and application-specific authorization.
+While there are no restrictions on the implementation of `uploadData` and the related backend API,
+this repository provides a reference implementation for both the client-side implementation and the backend
+API which will support most simple use-cases.  It provides extension points that will allow you to customize
+the behavior to your own requirements, or you can modify it to suit your specific case.
+
+- [backend/powersync-reference-write-api.openapi.yaml](backend/powersync-reference-write-api.openapi.yaml) provides a simple but flexible API definition that serves as a contract between frontend and backend.
+- A reference `uploadData` implementation handles most common workflows and will marshal queued changes to the format specified by the API definition.
+- A reference backend accepts API requests from the front-end and writes them to your source database. This includes an Express API, adapters for Postgres, MongoDB, MySQL, and SQL Server.
+
+You supply the database, PowerSync instance, client application, and application-specific authorization, and you must copy the example `uploadData` implementation to your front-end code.
 
 ## Setup
 
@@ -14,7 +21,7 @@ local development and tests use Node.js 24 and pnpm 9.
 
 ### 1. Configure the database
 
-Edit the root `.env` for Docker Compose:
+Set these in `.env.local` (or the root `.env` for shared defaults) for Docker Compose:
 
 | Variable | Meaning |
 | --- | --- |
@@ -29,8 +36,7 @@ flags.
 
 Use the database that your PowerSync instance already replicates. Tables and columns
 must match uploaded operations unless you add [schema mapping](docs/schema-mapping.md).
-MongoDB transactions require a replica set or sharded cluster; the default MongoDB
-mapper also requires collection `$jsonSchema` validators.
+The default MongoDB mapper also requires collection `$jsonSchema` validators.
 
 In Docker Desktop, use `host.docker.internal` to reach a database on the host.
 For a backend running directly on the host, use the database's host-accessible address,
@@ -40,7 +46,7 @@ such as `localhost`. Other Docker environments may require a host-gateway config
 
 Follow [the auth setup guide](backend/src/auth/SETUP.md). The default backend reads a
 PowerSync Cloud export from `backend/powersync-config.json`; generic providers also
-require an expected issuer and audience in `backend/src/auth/verifier.ts`.
+need `AUTH_ISSUER` and `AUTH_INSTANCE_URL` (or `AUTH_AUDIENCE`) set in `.env.local`.
 
 Compose mounts the export read-only. To use a different file, set `POWERSYNC_CONFIG_PATH`
 to its absolute host path in the root `.env`. The file must exist before starting Compose.
