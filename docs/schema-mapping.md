@@ -112,7 +112,7 @@ table. Skipped operations are not an error.
 ### Installing it
 
 Factories take `(uri, mapper?)` and are stored in a record, so wrap the one you want. Edit
-`backend/src/persistance/persister-factories.ts`:
+`backend/src/persistence/persister-factories.ts`:
 
 ```ts
 import { renamingMapper } from '../mapping/renames.js';

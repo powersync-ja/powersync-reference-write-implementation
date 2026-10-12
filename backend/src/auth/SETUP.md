@@ -112,40 +112,6 @@ Startup calls `initializeVerifier()` before listening. Invalid configuration pro
 verification, so startup does not test their availability. Configuration and inline keys are
 cached per process; restart after changing them. Remote keys refresh according to the cache policy.
 
-## Local demo authentication
-
-For the manual HTTP checks, create `backend/powersync-config.json` with this content:
-
-```json
-{
-  "config": {
-    "client_auth": {
-      "jwks_uri": "http://127.0.0.1:6060/api/auth/keys"
-    }
-  }
-}
-```
-
-This is a local test configuration using the Cloud export format, not an export from an instance.
-Set the supplements in the environment file for your run mode:
-
-```sh
-AUTH_ISSUER=powersync-dev
-AUTH_AUDIENCE=powersync-dev
-AUTH_ALLOW_LOCAL_HTTP=true
-```
-
-Also set `JWT_ISSUER=powersync-dev` and `POWERSYNC_URL=powersync-dev` there (the demo token
-endpoint mints with those). Generate a signing pair with `pnpm --dir backend generate-keys` and copy
-both values into that same environment file. The loopback JWKS URL works inside the backend
-container and for a local backend on port 6060. Adjust it if you change the backend's port.
-
-This setup tests writes without a sync connection. To sync with a real PowerSync instance,
-configure that instance to trust the demo keys and accept the token's audience. The instance
-must reach its configured JWKS URL; a cloud instance cannot use your backend's loopback URL.
-Set the client's sync URL to the real instance URL. The client's sync URL and the token's
-`aud` are separate settings, even when they have the same value.
-
 ## Self-hosted PowerSync
 
 Use the configuration that runs your PowerSync service. Parse its YAML and resolve `!env`
