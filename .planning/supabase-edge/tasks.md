@@ -21,9 +21,9 @@ Spike findings (CLI 2.98.2, edge-runtime 1.73.13 ≈ Deno 2.1.4; local Deno 2.7.
 - [x] Split portable identity types out of `backend/src/auth/types.ts`; the Express augmentation stays Node-only (now `src/auth/express.d.ts`)
 
 **2. Extract the transaction engine**
-- [ ] Runtime-independent factory pulled out of `backend/src/api/data.ts` (inject persister, authorizer, fatal handler, batch policy)
-- [ ] Express route becomes a thin wrapper; existing customization entry points are kept
-- [ ] `fatal-error-handler.ts`: Web Crypto `randomUUID`; callback scheduling is injected (Node fire-and-forget, Edge awaited)
+- [x] Runtime-independent factory pulled out of `backend/src/api/data.ts` (inject persister, authorizer, fatal handler, batch policy)
+- [x] Express route becomes a thin wrapper; existing customization entry points are kept
+- [x] `fatal-error-handler.ts`: Web Crypto `randomUUID`; callback scheduling is injected (Node fire-and-forget, Edge awaited). Done as `src/write/processor.ts` (`createTransactionProcessor`, `awaitDeadLetter` option) and `src/write/dead-letter.ts`; `fatal-error-handler.ts` re-exports the types and keeps the Node singleton
 
 **3. Postgres adapter hardening** (Node defaults unchanged)
 - [ ] Pass the full connection string through (TLS/query options, decoded credentials)

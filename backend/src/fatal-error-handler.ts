@@ -1,12 +1,7 @@
-import { randomUUID } from 'node:crypto';
-import type { AuthContext } from './auth/types.ts';
-import type { components } from './generated/api.ts';
-import type { FatalOperationError, JsonValue } from './errors.ts';
+import { deliverDeadLetter, type FatalErrorContext, type FatalErrorHandler } from './write/dead-letter.ts';
+import type { FatalOperationError } from './errors.ts';
 
-export interface FatalErrorHandler {
-  requiresClientHandling(error: FatalOperationError, context: FatalErrorContext): boolean | Promise<boolean>;
-  onDeadLetter(entry: DeadLetterEntry): void | Promise<void>;
-}
+export type { DeadLetterEntry, FatalErrorContext, FatalErrorHandler } from './write/dead-letter.ts';
 
 /** Replace these methods with application routing and developer-owned storage/notifications. */
 export const fatalErrorHandler: FatalErrorHandler = {
@@ -19,37 +14,7 @@ export const fatalErrorHandler: FatalErrorHandler = {
   }
 };
 
-export interface FatalErrorContext {
-  transaction: components['schemas']['CrudTransaction'];
-  auth: AuthContext;
-}
-
-export interface DeadLetterEntry {
-  occurrenceId: string;
-  timestamp: string;
-  transaction: FatalErrorContext['transaction'];
-  authenticatedSubject: string;
-  errorCode: string;
-  message: string;
-  details?: JsonValue;
-  operationIndex?: number;
-}
-
 /** Logs callback failures without changing the transaction result. Returned promises are not awaited. */
 export function notifyDeadLetter(error: FatalOperationError, context: FatalErrorContext): void {
-  try {
-    const pending = fatalErrorHandler.onDeadLetter({
-      occurrenceId: randomUUID(),
-      timestamp: new Date().toISOString(),
-      transaction: context.transaction,
-      authenticatedSubject: context.auth.sub,
-      errorCode: error.errorCode,
-      message: error.message,
-      details: error.details,
-      operationIndex: error.operationIndex
-    });
-    void Promise.resolve(pending).catch((failure) => console.error('Dead-letter handler failed:', failure));
-  } catch (failure) {
-    console.error('Dead-letter handler failed:', failure);
-  }
+  void deliverDeadLetter(fatalErrorHandler, error, context);
 }
