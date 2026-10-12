@@ -1,2 +1,5 @@
 # Ignore all node_modules
 **/node_modules/**
+
+# Generated; compared byte-for-byte by edge-validator.test.ts
+src/generated/transaction-batch-validator.ts

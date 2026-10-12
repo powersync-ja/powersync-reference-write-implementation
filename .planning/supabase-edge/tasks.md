@@ -32,8 +32,8 @@ Spike findings (CLI 2.98.2, edge-runtime 1.73.13 ≈ Deno 2.1.4; local Deno 2.7.
 - [x] Optional cleanup seam for tests (`end()` on the returned persister; `PostgresPersisterOptions.pool` / `initializeTransaction`, default `setAppUserId`)
 
 **4. Edge validator**
-- [ ] Pick and lock a standalone validator generator; generate it from `powersync-reference-write-api.openapi.yaml` and commit the output
-- [ ] Parity test against the Node/Express validator
+- [x] Pick and lock a standalone validator generator; generate it from `powersync-reference-write-api.openapi.yaml` and commit the output (Ajv 8.17.1 standalone ESM via `pnpm generate-edge-validator`; int64 format compiled to EOV's numeric bounds so the output has no imports; wrapper `src/write/validate-batch.ts`)
+- [x] Parity test against the Node/Express validator (`edge-validator.test.ts`: 20 bodies, same accept/reject and message; plus a regeneration drift check)
 
 **5. Compose `supabase/functions/powersync-write`**
 - [ ] Routing for `/powersync-write/api/data`, CORS + preflight, required-claims config (issuer, audience, sub, exp, role)
