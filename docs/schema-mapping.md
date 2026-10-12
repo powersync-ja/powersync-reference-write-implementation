@@ -24,8 +24,15 @@ is taken from `entry.id` (falling back to `op_data.id`) and removed from the rem
 Replace it if your client and database schemas differ.
 
 MongoDB uses `createMongoMapper`. At startup, `discoverSchema` reads collection
-`$jsonSchema` validators through `db.listCollections()` and builds field type
-converters. See `backend/src/persistence/mongo/mongo-schema.ts`.
+`$jsonSchema` validators through `db.listCollections()` and builds a [Zod](https://zod.dev)
+schema for each collection (`backend/src/persistence/mongo/mongo-schema.ts`). The mapper validates
+each write against it and converts client values to BSON types: SQLite `0`/`1` to booleans, and
+date strings or epoch numbers to `Date`. Required fields must be present on `PUT`; `PATCH`
+needs only the changed fields. Fields the validator does not mention, and types it cannot check
+(objects, arrays, ObjectIds), pass through unchanged.
+
+A value that does not match, such as `'abc'` for an `int` field or `'false'` for a `bool`, fails
+as an `INVALID_DATA` fatal error. The error names the offending fields in `details`.
 
 With the default MongoDB mapper, a write to a collection without a discovered validator
 fails with `SCHEMA_MISMATCH`. The error includes the original operation index, and the
@@ -38,8 +45,8 @@ default mapper. Restart the backend after adding or changing validators.
 ## Custom mapping
 
 - **Rename tables or fields.** Return a different `table` or change the keys in `data`.
-- **Convert values.** Use a converter for fields whose JSON values differ from the
-  database type, such as timestamps or booleans. See `applySchema` in `mongo-schema.ts`.
+- **Convert values.** Convert fields whose JSON values differ from the database type, such as
+  timestamps or booleans. For MongoDB, see `collectionSchemaFromJsonSchema` in `mongo-schema.ts`.
 - **Set server-controlled fields.** Add or overwrite values such as `updated_at`.
   For ownership fields such as `owner_id` and `created_by`, see
   [authorization](authorization.md). The mapper does not receive the verified identity.
@@ -124,8 +131,9 @@ engine's factory needs its own change.
 ### MongoDB
 
 Passing a mapper to `createMongoPersister` skips `discoverSchema`, so your mapper must do any
-type conversion that the default MongoDB mapper would have derived from the `$jsonSchema`
-validators.
+validation and type conversion that the default MongoDB mapper would have derived from the
+`$jsonSchema` validators. You can reuse `collectionSchemaFromJsonSchema` or write your own Zod
+schemas.
 
 ### Failures you will see without a mapper
 
