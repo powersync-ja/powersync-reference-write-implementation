@@ -1,83 +1,78 @@
+import * as z from 'zod';
 import type { Db } from 'mongodb';
 
-export type TypeConverter = (v: unknown) => unknown;
+/** Validates and converts the fields of one collection's documents. */
+export type CollectionSchema = z.ZodObject;
 
-export type TableSchema = Record<string, TypeConverter>;
-
-export const types: Record<string, TypeConverter> = {
-  date: (v) => new Date(v as string | number),
-  boolean: (v) => !!v,
-  string: (v) => String(v),
-  number: (v) => Number(v)
-};
-
-const BSON_TYPE_CONVERTERS: Record<string, TypeConverter> = {
-  date: types.date,
-  bool: types.boolean,
-  boolean: types.boolean,
-  string: types.string,
-  int: types.number,
-  long: types.number,
-  double: types.number,
-  decimal: types.number,
-  number: types.number
-};
+type FieldDefinition = { bsonType?: string | string[] };
 
 /**
- * Derives a TableSchema from a $jsonSchema validator's `properties`. A field whose bsonType we
- * don't recognize (object, array, objectId, binData, ...) is left out of the result — applySchema
- * treats a missing entry as "pass this field through unconverted", not "drop it".
+ * Clients send SQLite values: booleans as 0/1 and dates as strings (or epoch numbers).
+ * Each builder accepts that wire format strictly and converts it to the BSON type.
  */
-function tableSchemaFromJsonSchema(jsonSchema: Record<string, unknown>): TableSchema {
-  const properties = (jsonSchema.properties ?? {}) as Record<string, { bsonType?: string | string[] }>;
-  const schema: TableSchema = {};
+const BSON_TYPE_VALIDATORS: Record<string, () => z.ZodType> = {
+  string: () => z.string(),
+  bool: () => z.union([z.boolean(), z.literal(0), z.literal(1)]).transform((v) => v === true || v === 1),
+  int: () => z.int(),
+  long: () => z.int(),
+  double: () => z.number(),
+  decimal: () => z.number(),
+  number: () => z.number(),
+  date: () => z.union([z.string(), z.number()]).pipe(z.coerce.date())
+};
+BSON_TYPE_VALIDATORS.boolean = BSON_TYPE_VALIDATORS.bool;
 
-  for (const [field, def] of Object.entries(properties)) {
-    const bsonType = Array.isArray(def?.bsonType) ? def.bsonType.find((t) => t !== 'null') : def?.bsonType;
-    const converter = bsonType ? BSON_TYPE_CONVERTERS[bsonType] : undefined;
-    if (converter) {
-      schema[field] = converter;
-    }
+function fieldSchema(def: FieldDefinition | undefined): z.ZodType {
+  const types = [def?.bsonType ?? []].flat();
+  const nullable = types.includes('null');
+  const validators = types.filter((t) => t !== 'null').map((t) => BSON_TYPE_VALIDATORS[t]);
+
+  // A field with no declared type, or any type we can't check (object, array, objectId, binData, ...),
+  // passes through unchanged. The database validator still enforces it.
+  if (validators.length === 0 || validators.some((v) => v === undefined)) {
+    return z.unknown();
   }
 
-  return schema;
+  const schemas = validators.map((v) => v());
+  const base = schemas.length === 1 ? schemas[0] : z.union(schemas as [z.ZodType, z.ZodType, ...z.ZodType[]]);
+  return nullable ? base.nullable() : base;
 }
 
 /**
- * Reads type mappings from collection $jsonSchema validators at startup.
- * Collections without a validator are omitted; the default persister rejects writes to them.
- * Restart the backend after changing validators to refresh these mappings.
+ * Builds a Zod schema from a collection's $jsonSchema validator. Fields in `required` must be
+ * present (PATCH operations use `.partial()`); fields the validator doesn't mention pass through.
+ * `_id` is excluded because the persister sets it from the operation's row ID.
  */
-export async function discoverSchema(db: Db): Promise<Record<string, TableSchema>> {
-  const schema: Record<string, TableSchema> = {};
+export function collectionSchemaFromJsonSchema(jsonSchema: Record<string, unknown>): CollectionSchema {
+  const properties = (jsonSchema.properties ?? {}) as Record<string, FieldDefinition>;
+  const required = new Set(Array.isArray(jsonSchema.required) ? (jsonSchema.required as string[]) : []);
+
+  const shape: Record<string, z.ZodType> = {};
+  for (const [field, def] of Object.entries(properties)) {
+    if (field === '_id') continue;
+    const schema = fieldSchema(def);
+    shape[field] = required.has(field) ? schema : schema.optional();
+  }
+
+  return z.looseObject(shape);
+}
+
+/**
+ * Reads collection schemas from $jsonSchema validators at startup.
+ * Collections without a validator are omitted; the default persister rejects writes to them.
+ * Restart the backend after changing validators to refresh these schemas.
+ */
+export async function discoverSchema(db: Db): Promise<Record<string, CollectionSchema>> {
+  const schema: Record<string, CollectionSchema> = {};
   const collections = await db.listCollections({}, { nameOnly: false }).toArray();
 
   for (const info of collections) {
     const jsonSchema = (info.options as { validator?: { $jsonSchema?: Record<string, unknown> } } | undefined)
       ?.validator?.$jsonSchema;
     if (jsonSchema) {
-      schema[info.name] = tableSchemaFromJsonSchema(jsonSchema);
+      schema[info.name] = collectionSchemaFromJsonSchema(jsonSchema);
     }
   }
 
   return schema;
-}
-
-/**
- * Converts fields with a matching type converter and preserves all other values.
- * Use MongoDB schema validation to enforce types in the database.
- */
-export function applySchema(tableSchema: TableSchema, data: Record<string, unknown>): Record<string, unknown> {
-  const converted: Record<string, unknown> = {};
-
-  for (const [key, rawValue] of Object.entries(data)) {
-    if (rawValue == null) {
-      converted[key] = rawValue;
-      continue;
-    }
-    const converter = tableSchema[key];
-    converted[key] = converter ? converter(rawValue) : rawValue;
-  }
-
-  return converted;
 }
