@@ -43,9 +43,17 @@ Spike findings (CLI 2.98.2, edge-runtime 1.73.13 ≈ Deno 2.1.4; local Deno 2.7.
 Phase 5 notes: `supabase functions serve` bind-mounts each backend file in the import graph, so shared imports work locally (`supabase start` alone mounts only `supabase/functions`). Local overrides are in `supabase/functions/.env` (issuer + `db` host). The demo `lists`/`todos` schema with RLS is in `supabase/seed.sql`, which runs locally only. Deno needs `compilerOptions.types` = `@types/pg` because pg ships no types. The gateway answers CORS preflight itself.
 
 **6. Local acceptance** (implementation-plan.md "Local acceptance")
-- [ ] Deno check + dependency-graph assertion (no mongo/mysql/mssql/express/dotenv/winston)
-- [ ] Local Supabase integration tests: CRUD, two-user RLS, pooled identity cleanup, rollback, stop/skip, validation, awaited callbacks
-- [ ] Auth negative cases + RS256 isolated verifier test
-- [ ] Connector compatibility with only the URL changed; deployment needs no backend install
-- [ ] README/docs for the Supabase example
+- [x] Deno check + dependency-graph assertion (no mongo/mysql/mssql/express/dotenv/winston)
+- [x] Local Supabase integration tests: CRUD, two-user RLS, pooled identity cleanup, rollback, stop/skip, validation, awaited callbacks
+- [x] Auth negative cases + RS256 isolated verifier test
+- [x] Connector compatibility with only the URL changed; deployment needs no backend install
+- [x] README/docs for the Supabase example
+
+Phase 6 notes (2026-10-12, local only):
+- `deno task test` (6 tests, 22 steps) passes against `supabase start` + `functions serve`. Backend: 128 vitest tests, `tsc -b` clean.
+- A clean clone without `backend/node_modules` passes `deno check --frozen` with an empty DENO_DIR.
+- Stop/skip routing and awaited dead-letter callbacks are covered by `backend/write-processor.test.ts` and `fatal-routing.test.ts`. Over HTTP the function only exercises `stop`, because the policy is a constant in `config.ts`.
+- Rejection layers seen locally: missing, malformed, and bad-signature tokens, plus API keys, are rejected by the gateway. Expired, wrong issuer/audience/role, empty sub, and missing exp are rejected by the function (required-claims or `userIdentity`). Not separately recorded per case.
+- Gotcha: anything that rewrites `deno.lock` restarts `functions serve` and causes transient 502s. The test task uses `--frozen`.
+- Not covered locally: JWKS outage, key rotation, pooler/TLS, deployed bundle size (see hosted-test-spec.md).
 

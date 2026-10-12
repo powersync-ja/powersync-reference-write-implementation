@@ -7,6 +7,9 @@ The repository includes an Express API, adapters for Postgres, MongoDB, MySQL, a
 SQL Server, and reference TypeScript connectors. You supply the database, PowerSync
 instance, client application, and application-specific authorization.
 
+On Supabase, you can deploy the same write API as an Edge Function that enforces your RLS
+policies instead; see [Supabase Edge Function](docs/supabase-edge.md).
+
 ## Setup
 
 Run the commands below from the repository root. Docker Compose runs the backend;
