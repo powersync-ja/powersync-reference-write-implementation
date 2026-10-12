@@ -21,7 +21,10 @@ The factories are configured in `backend/src/persistence/persister-factories.ts`
 Postgres, MySQL, and SQL Server use `defaultMapper`. It preserves table and field
 names without converting or validating values, and logs this on every call. The row ID
 is taken from `entry.id` (falling back to `op_data.id`) and removed from the remaining fields.
-Replace it if your client and database schemas differ.
+Replace it if your client and database schemas differ. A client table or column that does not
+exist in the source fails as a `SCHEMA_MISMATCH` fatal error (for example
+`Table 'db.expanded_todos' doesn't exist`), reported with the failing operation's index, and the
+whole transaction is rolled back. See [error handling](error-handling.md).
 
 MongoDB uses `createMongoMapper`. At startup, `discoverSchema` reads collection
 `$jsonSchema` validators through `db.listCollections()` and builds a [Zod](https://zod.dev)
@@ -35,9 +38,7 @@ A value that does not match, such as `'abc'` for an `int` field or `'false'` for
 as an `INVALID_DATA` fatal error. The error names the offending fields in `details`.
 
 With the default MongoDB mapper, a write to a collection without a discovered validator
-fails with `SCHEMA_MISMATCH`. The error includes the original operation index, and the
-whole transaction is rolled back. The shared [fatal-error handler](error-handling.md)
-routes the failure. A custom mapper handles its own schema mapping.
+fails with `SCHEMA_MISMATCH` in the same way. A custom mapper handles its own schema mapping.
 
 Add a `$jsonSchema` validator for each collection that accepts writes through the
 default mapper. Restart the backend after adding or changing validators.
@@ -68,13 +69,10 @@ default mapper. Restart the backend after adding or changing validators.
   can map to the same source column in one `PUT`, decide which wins; the stream may serve the
   same value under both names.
 
-### Do not wrap `defaultMapper`
-
-`defaultMapper` logs an error on every call to warn that nothing is renamed or validated.
-A mapper that calls it prints that warning for every operation, even though it does map.
-Copy its few lines of ID and field handling instead.
-
 ### Example: rename a table and a column
+
+Copy the ID and field handling from `defaultMapper` instead of wrapping it: it logs an error on
+every call, which would repeat for every operation even though your mapper does map.
 
 ```ts
 // backend/src/mapping/renames.ts
@@ -134,12 +132,6 @@ Passing a mapper to `createMongoPersister` skips `discoverSchema`, so your mappe
 validation and type conversion that the default MongoDB mapper would have derived from the
 `$jsonSchema` validators. You can reuse `collectionSchemaFromJsonSchema` or write your own Zod
 schemas.
-
-### Failures you will see without a mapper
-
-A client table or column that does not exist in the source fails as a `SCHEMA_MISMATCH` fatal
-error (for example `Table 'db.expanded_todos' doesn't exist`), reported with the index of the
-failing operation, and the whole transaction is rolled back. See [error handling](error-handling.md).
 
 ## Database lookups and multiple writes
 
