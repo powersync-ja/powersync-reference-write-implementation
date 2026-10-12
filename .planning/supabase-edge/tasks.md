@@ -36,9 +36,11 @@ Spike findings (CLI 2.98.2, edge-runtime 1.73.13 ≈ Deno 2.1.4; local Deno 2.7.
 - [x] Parity test against the Node/Express validator (`edge-validator.test.ts`: 20 bodies, same accept/reject and message; plus a regeneration drift check)
 
 **5. Compose `supabase/functions/powersync-write`**
-- [ ] Routing for `/powersync-write/api/data`, CORS + preflight, required-claims config (issuer, audience, sub, exp, role)
-- [ ] Transaction init: verified claims + fixed `authenticated` role, both transaction-local
-- [ ] Local editable mapper / authorizer / fatal-hook modules
+- [x] Routing for `/powersync-write/api/data`, CORS + preflight, required-claims config (issuer, audience, sub, exp, role)
+- [x] Transaction init: verified claims + fixed `authenticated` role, both transaction-local
+- [x] Local editable mapper / authorizer / fatal-hook modules
+
+Phase 5 notes: `supabase functions serve` bind-mounts each backend file in the import graph, so shared imports work locally (`supabase start` alone mounts only `supabase/functions`). Local overrides are in `supabase/functions/.env` (issuer + `db` host). The demo `lists`/`todos` schema with RLS is in `supabase/seed.sql`, which runs locally only. Deno needs `compilerOptions.types` = `@types/pg` because pg ships no types. The gateway answers CORS preflight itself.
 
 **6. Local acceptance** (implementation-plan.md "Local acceptance")
 - [ ] Deno check + dependency-graph assertion (no mongo/mysql/mssql/express/dotenv/winston)
