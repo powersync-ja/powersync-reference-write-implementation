@@ -5,19 +5,6 @@ import type { AuthSupplements } from './types.js';
  * Environment variable for each supplement. Set them in the root `.env` (shared defaults) or
  * `.env.local` (this machine) for Docker Compose, or in `backend/.env` when running on the host.
  * Unset or blank means "not supplied". List values are comma-separated.
- *
- * | Variable | Supplement |
- * | --- | --- |
- * | `AUTH_ISSUER` | `issuer` |
- * | `AUTH_AUDIENCE` | `audience` (list) |
- * | `AUTH_INSTANCE_URL` | `instanceUrl` |
- * | `AUTH_SUPABASE_URL` | `supabaseUrl` |
- * | `AUTH_PROVIDER` | `provider`: `supabase` or `generic` |
- * | `AUTH_JWKS_URI` | `jwksUri` |
- * | `AUTH_JWKS_URI_OVERRIDE` | `jwksUriOverride` (list) |
- * | `AUTH_ALGORITHMS` | `algorithms` (list) |
- * | `AUTH_ALLOW_LOCAL_HTTP` | `allowLocalHttp`: `true` or `false` |
- * | `AUTH_ALLOW_INSECURE_HTTP_HOSTS` | `allowInsecureHttpHosts` (list) |
  */
 export function supplementsFromEnv(env: NodeJS.ProcessEnv = process.env): AuthSupplements {
   const text = (name: string): string | undefined => {
