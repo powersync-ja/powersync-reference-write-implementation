@@ -10,8 +10,7 @@ instance, client application, and application-specific authorization.
 ## Setup
 
 Run the commands below from the repository root. Docker Compose runs the backend;
-local development and tests use Node.js 24 and pnpm 9. The existing `backend/.nvmrc`
-pins an older Node version, so select Node 24 explicitly for local work.
+local development and tests use Node.js 24 and pnpm 9.
 
 ### 1. Configure the database
 
@@ -26,7 +25,7 @@ Edit the root `.env` for Docker Compose:
 `.env` is committed, so keep it to shared defaults. Put this machine's values and any secret, such
 as a `DATABASE_URI` with a password, in a `.env.local` beside it: it is gitignored, optional, and
 overrides `.env`. Compose passes both files to the container, so `docker compose up` needs no extra
-flags. Setting a variable in your shell no longer overrides them; use `.env.local` instead.
+flags.
 
 Use the database that your PowerSync instance already replicates. Tables and columns
 must match uploaded operations unless you add [schema mapping](docs/schema-mapping.md).
@@ -85,8 +84,8 @@ separately to control which rows each user can read.
 
 [Schema mapping](docs/schema-mapping.md) describes field conversion and custom writes.
 [Error handling](docs/error-handling.md) explains rejected transactions, queue retention,
-and the optional dead-letter callback. By default, fatal failures are logged by the backend
-and removed from the client upload queue. The callback does not provide durable storage.
+and the optional dead-letter callback. By default, fatal failures other than `UNAUTHORIZED` are logged by the backend
+and removed from the client upload queue; authorization rejections stay queued. The callback does not provide durable storage.
 
 ## API
 

@@ -1,14 +1,14 @@
 MANUAL TEST PLAN — PowerSync Reference Write Implementation
 
 Run commands from the repository root unless stated otherwise. Use a disposable
-Postgres database and the local demo auth configuration. These checks do not require
-a PowerSync instance; they do not test replication or client sync.
+Postgres database. You need a PowerSync auth export and a current token from the identity
+provider it trusts (see backend/src/auth/SETUP.md). These checks do not test replication
+or client sync.
 
 Record your starting git status and preserve any existing local changes. The steps
 below edit .env (or .env.local) and the AUTH_* supplements. Restore only the changes made for this test.
 
 Prerequisites: Docker Desktop, Node.js 24, pnpm 9, curl, and Python 3.
-Select Node 24 explicitly; backend/.nvmrc currently pins an older version.
 
 [ ] Install backend dependencies:
 
@@ -65,17 +65,11 @@ Select Node 24 explicitly; backend/.nvmrc currently pins an older version.
     Use Docker Desktop's host.docker.internal here. Other Docker environments need
     an equivalent host address. Leave POWERSYNC_CONFIG_PATH unset to use the default.
 
-[ ] Generate signing keys and copy both printed values into the root .env:
+[ ] Configure authentication as described in backend/src/auth/SETUP.md: export your
+    PowerSync configuration to backend/powersync-config.json and set any AUTH_* supplements
+    in the root .env.
 
-        pnpm --dir backend generate-keys
-
-[ ] Follow backend/src/auth/SETUP.md, "Local demo authentication":
-    - Create backend/powersync-config.json with the loopback JWKS URL.
-    - Set AUTH_ISSUER, AUTH_AUDIENCE, and AUTH_ALLOW_LOCAL_HTTP in the environment file.
-    - Use the powersync-dev issuer and audience shown above.
-
-    Remote keys are fetched after the API starts, so the loopback JWKS does not
-    require a second server or a pre-existing token.
+    Remote keys are fetched after the API starts, so startup does not need a token.
 
 [ ] Start the backend with the updated code and settings:
 
