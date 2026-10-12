@@ -1,10 +1,28 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/assert@1.0.13": "1.0.13",
+    "jsr:@std/internal@^1.0.6": "1.0.14",
+    "jsr:@std/path@1.0.8": "1.0.8",
     "npm:@supabase/middleware@1.0.0": "1.0.0",
     "npm:@supabase/server@1.9.2": "1.9.2_@supabase+supabase-js@2.117.3_pg@8.13.0",
     "npm:@types/pg@8.20.0": "8.20.0",
+    "npm:jose@6.2.12": "6.2.12",
     "npm:pg@8.13.0": "8.13.0"
+  },
+  "jsr": {
+    "@std/assert@1.0.13": {
+      "integrity": "ae0d31e41919b12c656c742b22522c32fb26ed0cba32975cb0de2a273cb68b29",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
+    },
+    "@std/path@1.0.8": {
+      "integrity": "548fa456bb6a04d3c1a1e7477986b6cffbce95102d0bb447c67c4ee70e0364be"
+    }
   },
   "npm": {
     "@supabase/auth-js@2.117.3": {
@@ -170,9 +188,12 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@std/assert@1.0.13",
+      "jsr:@std/path@1.0.8",
       "npm:@supabase/middleware@1.0.0",
       "npm:@supabase/server@1.9.2",
       "npm:@types/pg@8.20.0",
+      "npm:jose@6.2.12",
       "npm:pg@8.13.0"
     ]
   }
