@@ -84,5 +84,5 @@ pnpm --dir backend generate-types
 ```
 
 This updates both generated clients. The single-file version has hand-written types; update
-those and its behavior using [the maintenance instructions](src/PowersyncConnector.singlefile.prompt.md).
+those and its behavior using [the maintenance instructions](../docs/single-file-connector-maintenance.md).
 Keep both versions consistent and run `pnpm --dir backend test`.
