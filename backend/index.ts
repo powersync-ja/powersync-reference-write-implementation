@@ -1,9 +1,9 @@
-import app from './app.js';
-import config from './config.js';
-import { getPersister } from './src/persistence/persister.js';
-import { ConfigurationError } from './src/errors.js';
-import { initializeVerifier } from './src/auth/verifier.js';
-import { AuthConfigurationError } from './src/auth/verifier/index.js';
+import app from './app.ts';
+import config from './config.ts';
+import { getPersister } from './src/persistence/persister.ts';
+import { ConfigurationError } from './src/errors.ts';
+import { initializeVerifier } from './src/auth/verifier.ts';
+import { AuthConfigurationError } from './src/auth/verifier/index.ts';
 
 const PORT = process.env.PORT || config.port;
 

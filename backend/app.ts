@@ -2,8 +2,8 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as OpenApiValidator from 'express-openapi-validator';
-import { apiRouter } from './src/api/index.js';
-import logRequest from './src/middleware/logger.js';
+import { apiRouter } from './src/api/index.ts';
+import logRequest from './src/middleware/logger.ts';
 import type { Request, Response, NextFunction } from 'express';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

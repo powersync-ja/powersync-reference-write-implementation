@@ -1,6 +1,6 @@
-import { applySchema } from '../persistence/mongo/mongo-schema.js';
-import type { TableSchema } from '../persistence/mongo/mongo-schema.js';
-import type { EntryMapper } from './types.js';
+import { applySchema } from '../persistence/mongo/mongo-schema.ts';
+import type { TableSchema } from '../persistence/mongo/mongo-schema.ts';
+import type { EntryMapper } from './types.ts';
 
 /**
  * Converts fields using collection schemas discovered at startup.

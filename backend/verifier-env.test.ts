@@ -3,8 +3,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
-import { supplementsFromEnv } from './src/auth/verifier/env.js';
-import { AuthConfigurationError } from './src/auth/verifier/index.js';
+import { supplementsFromEnv } from './src/auth/verifier/env.ts';
+import { AuthConfigurationError } from './src/auth/verifier/index.ts';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -83,7 +83,7 @@ describe('verifier configured only through the environment', () => {
     await withGenericConfig(async (sign) => {
       vi.stubEnv('AUTH_ISSUER', 'https://issuer.example.com');
       vi.stubEnv('AUTH_AUDIENCE', 'https://instance.example.com');
-      const { initializeVerifier, verifier } = await import('./src/auth/verifier.js');
+      const { initializeVerifier, verifier } = await import('./src/auth/verifier.ts');
       await initializeVerifier();
       await expect(verifier.verify(await sign({ iss: 'https://issuer.example.com', aud: 'https://instance.example.com' })))
         .resolves.toMatchObject({ sub: 'user-1' });
@@ -96,7 +96,7 @@ describe('verifier configured only through the environment', () => {
 
   it('refuses to start without them and points at the environment, not at the source file', async () => {
     await withGenericConfig(async () => {
-      const { initializeVerifier } = await import('./src/auth/verifier.js');
+      const { initializeVerifier } = await import('./src/auth/verifier.ts');
       const failure = await initializeVerifier().catch((error: unknown) => error);
       // Not toBeInstanceOf: resetModules gives the dynamically imported verifier its own copy of the class.
       expect(failure).toMatchObject({ code: 'AUTH_CONFIGURATION' });

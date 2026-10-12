@@ -17,8 +17,8 @@ Spike findings (CLI 2.98.2, edge-runtime 1.73.13 ≈ Deno 2.1.4; local Deno 2.7.
 - Under `supabase start`, function code is not hot-reloaded. Restart the edge container or use `supabase functions serve` while developing.
 
 **1. Deno-compatible shared imports**
-- [ ] Switch shared modules from `.js` to `.ts` sibling imports; set `allowImportingTsExtensions` (or equivalent) in `backend/tsconfig.json`; `pnpm check` + `pnpm test` stay green
-- [ ] Split portable identity types out of `backend/src/auth/types.ts`; the Express augmentation stays Node-only
+- [x] Switch shared modules from `.js` to `.ts` sibling imports; set `allowImportingTsExtensions` (or equivalent) in `backend/tsconfig.json`; `pnpm check` + `pnpm test` stay green
+- [x] Split portable identity types out of `backend/src/auth/types.ts`; the Express augmentation stays Node-only (now `src/auth/express.d.ts`)
 
 **2. Extract the transaction engine**
 - [ ] Runtime-independent factory pulled out of `backend/src/api/data.ts` (inject persister, authorizer, fatal handler, batch policy)

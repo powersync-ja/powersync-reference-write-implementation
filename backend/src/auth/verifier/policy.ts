@@ -1,10 +1,10 @@
 import type { JWK } from 'jose';
 import type {
   AuthSupplements, Diagnostic, KeySource, ResolutionResult, ResolvedAuthConfig,
-} from './types.js';
+} from './types.ts';
 import {
   ASYMMETRIC_ALGORITHMS, httpTrust, keyUrl, nonempty, object, publicKey, strings,
-} from './validation.js';
+} from './validation.ts';
 
 export type IssueKind = 'invalid' | 'unsupported' | 'missing';
 

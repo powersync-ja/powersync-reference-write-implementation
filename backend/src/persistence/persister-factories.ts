@@ -1,8 +1,8 @@
-import { createMongoPersister } from './mongo/mongo-persistence.js';
-import { createMySQLPersister } from './mysql/mysql-persistence.js';
-import { createPostgresPersister } from './postgres/postgres-persistence.js';
-import { createMSSQLPersister } from './mssql/mssql-persistence.js';
-import type { PersisterFactory } from '../types.js';
+import { createMongoPersister } from './mongo/mongo-persistence.ts';
+import { createMySQLPersister } from './mysql/mysql-persistence.ts';
+import { createPostgresPersister } from './postgres/postgres-persistence.ts';
+import { createMSSQLPersister } from './mssql/mssql-persistence.ts';
+import type { PersisterFactory } from '../types.ts';
 
 export const factories: Record<string, PersisterFactory> = {
   mongodb: createMongoPersister,

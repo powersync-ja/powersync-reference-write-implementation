@@ -2,9 +2,9 @@ import { createLocalJWKSet, createRemoteJWKSet, customFetch, errors, jwtVerify }
 import type { JWTVerifyGetKey } from 'jose';
 import {
   AuthConfigurationError, InvalidTokenError, KeyFetchError,
-} from './types.js';
-import type { KeySource, ResolvedAuthConfig, TokenVerifier } from './types.js';
-import { ASYMMETRIC_ALGORITHMS, httpTrust, keyUrl, nonempty, publicKey, strings } from './validation.js';
+} from './types.ts';
+import type { KeySource, ResolvedAuthConfig, TokenVerifier } from './types.ts';
+import { ASYMMETRIC_ALGORITHMS, httpTrust, keyUrl, nonempty, publicKey, strings } from './validation.ts';
 
 export interface VerifierOptions {
   /** Optional transport injection, principally for deterministic tests. Must be trusted. */

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
-import { FatalOperationError, RetryableError } from './src/errors.js';
+import { FatalOperationError, RetryableError } from './src/errors.ts';
 const db = vi.hoisted(() => ({
   operation: vi.fn(),
   commit: vi.fn(),
@@ -76,17 +76,17 @@ vi.mock('mongodb', () => ({
     }
   }
 }));
-vi.mock('./src/persistence/mongo/mongo-schema.js', () => ({ discoverSchema: db.schema }));
-vi.mock('./src/persistence/persister.js', () => ({ getPersister: async () => ({ updateBatch: db.persist }) }));
-vi.mock('./src/auth/authorizer.js', () => ({ authorizer: { authorize: () => true } }));
-vi.mock('./src/auth/verifier.js', () => ({ verifier: { verify: async () => ({ sub: 'verified', claims: {} }) } }));
-import app from './app.js';
-import { createPostgresPersister } from './src/persistence/postgres/postgres-persistence.js';
-import { createMySQLPersister } from './src/persistence/mysql/mysql-persistence.js';
-import { createMSSQLPersister } from './src/persistence/mssql/mssql-persistence.js';
-import { createMongoPersister } from './src/persistence/mongo/mongo-persistence.js';
-import type { EntryMapper } from './src/mapping/types.js';
-import { defaultMapper } from './src/mapping/default.js';
+vi.mock('./src/persistence/mongo/mongo-schema.ts', () => ({ discoverSchema: db.schema }));
+vi.mock('./src/persistence/persister.ts', () => ({ getPersister: async () => ({ updateBatch: db.persist }) }));
+vi.mock('./src/auth/authorizer.ts', () => ({ authorizer: { authorize: () => true } }));
+vi.mock('./src/auth/verifier.ts', () => ({ verifier: { verify: async () => ({ sub: 'verified', claims: {} }) } }));
+import app from './app.ts';
+import { createPostgresPersister } from './src/persistence/postgres/postgres-persistence.ts';
+import { createMySQLPersister } from './src/persistence/mysql/mysql-persistence.ts';
+import { createMSSQLPersister } from './src/persistence/mssql/mssql-persistence.ts';
+import { createMongoPersister } from './src/persistence/mongo/mongo-persistence.ts';
+import type { EntryMapper } from './src/mapping/types.ts';
+import { defaultMapper } from './src/mapping/default.ts';
 
 const batch = [
   { op: 'DELETE' as const, id: '1', table: 'items' },
@@ -128,7 +128,7 @@ describe('Postgres connection recovery', () => {
     expect(db.release).toHaveBeenCalledOnce();
   });
   it('returns retryable_error through the actual API when acquiring a connection fails', async () => {
-    const { fatalErrorHandler } = await import('./src/fatal-error-handler.js');
+    const { fatalErrorHandler } = await import('./src/fatal-error-handler.ts');
     const notify = vi.spyOn(fatalErrorHandler, 'onDeadLetter').mockImplementation(() => {});
     try {
       db.connect.mockRejectedValueOnce(Object.assign(new Error('connection refused'), { code: 'ECONNREFUSED' }));
@@ -176,7 +176,7 @@ for (const [name, factory] of [
   });
 }
 it('Mongo missing-schema failure rolls back before shared routing once', async () => {
-  const { fatalErrorHandler } = await import('./src/fatal-error-handler.js');
+  const { fatalErrorHandler } = await import('./src/fatal-error-handler.ts');
   const notify = vi.spyOn(fatalErrorHandler, 'onDeadLetter').mockImplementation(() => {
     expect(db.rollback).toHaveBeenCalledOnce();
   });

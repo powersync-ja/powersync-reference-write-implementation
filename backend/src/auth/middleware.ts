@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { TokenVerifier } from './types.js';
+import type { TokenVerifier } from './types.ts';
 
 /**
  * Gate: require a valid bearer token, verified by the given TokenVerifier.

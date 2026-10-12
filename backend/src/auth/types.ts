@@ -12,12 +12,3 @@ export interface AuthContext {
   sub: string;
   claims: Record<string, unknown>;
 }
-
-declare global {
-  namespace Express {
-    interface Request {
-      /** Set by requireAuth after successful verification. */
-      auth?: AuthContext;
-    }
-  }
-}

@@ -1,11 +1,11 @@
-import config from '../../config.js';
-import { fatalErrorHandler, notifyDeadLetter, type FatalErrorContext } from '../fatal-error-handler.js';
+import config from '../../config.ts';
+import { fatalErrorHandler, notifyDeadLetter, type FatalErrorContext } from '../fatal-error-handler.ts';
 import express, { type Request, type Response } from 'express';
-import { getPersister } from '../persistence/persister.js';
-import { authorizer } from '../auth/authorizer.js';
-import { FatalOperationError, RetryableError } from '../errors.js';
-import type { AuthContext } from '../auth/types.js';
-import type { OpBody, OpResponse, TransactionResult } from '../types.js';
+import { getPersister } from '../persistence/persister.ts';
+import { authorizer } from '../auth/authorizer.ts';
+import { FatalOperationError, RetryableError } from '../errors.ts';
+import type { AuthContext } from '../auth/types.ts';
+import type { OpBody, OpResponse, TransactionResult } from '../types.ts';
 
 const router = express.Router();
 

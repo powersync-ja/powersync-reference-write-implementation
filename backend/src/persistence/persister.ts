@@ -1,7 +1,7 @@
-import config from '../../config.js';
-import { factories } from './persister-factories.js';
-import { ConfigurationError } from '../errors.js';
-import type { Persister } from '../types.js';
+import config from '../../config.ts';
+import { factories } from './persister-factories.ts';
+import { ConfigurationError } from '../errors.ts';
+import type { Persister } from '../types.ts';
 
 let substituted: Persister | null = null;
 let fromConfig: Promise<Persister> | null = null;

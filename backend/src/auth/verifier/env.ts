@@ -1,5 +1,5 @@
-import { AuthConfigurationError } from './types.js';
-import type { AuthSupplements } from './types.js';
+import { AuthConfigurationError } from './types.ts';
+import type { AuthSupplements } from './types.ts';
 
 /**
  * Environment variable for each supplement. Set them in the root `.env` (shared defaults) or

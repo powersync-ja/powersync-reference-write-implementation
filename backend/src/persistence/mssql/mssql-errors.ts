@@ -1,4 +1,4 @@
-import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.js';
+import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.ts';
 
 const MSSQL_NUMBERS: Record<number, ErrorCode> = {
   515: 'NOT_NULL_VIOLATION',

@@ -1,11 +1,11 @@
-import { FatalOperationError } from '../../errors.js';
+import { FatalOperationError } from '../../errors.ts';
 import mysql from 'mysql2/promise';
-import type { Persister, CrudEntry } from '../../types.js';
-import { classifyMySQLError } from './mysql-errors.js';
+import type { Persister, CrudEntry } from '../../types.ts';
+import { classifyMySQLError } from './mysql-errors.ts';
 import type { RowDataPacket } from 'mysql2/promise';
-import type { EntryMapper } from '../../mapping/types.js';
-import { defaultMapper } from '../../mapping/default.js';
-import type { AuthContext } from '../../auth/types.js';
+import type { EntryMapper } from '../../mapping/types.ts';
+import { defaultMapper } from '../../mapping/default.ts';
+import type { AuthContext } from '../../auth/types.ts';
 
 function escapeIdentifier(identifier: string): string {
   return `\`${identifier.replace(/`/g, '``').replace(/\./g, '`.`')}\``;

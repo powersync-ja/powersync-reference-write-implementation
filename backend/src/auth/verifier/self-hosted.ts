@@ -1,9 +1,9 @@
 import {
   algorithmPolicy, Diagnostics, inlineSource, overrideUris, remoteSources, resolved,
   supplementShapes, transport, uriList,
-} from './policy.js';
-import type { AuthSupplements, KeySource, ResolutionResult } from './types.js';
-import { nonempty, object, strings } from './validation.js';
+} from './policy.ts';
+import type { AuthSupplements, KeySource, ResolutionResult } from './types.ts';
+import { nonempty, object, strings } from './validation.ts';
 
 /**
  * Pure import of a self-hosted PowerSync service configuration.

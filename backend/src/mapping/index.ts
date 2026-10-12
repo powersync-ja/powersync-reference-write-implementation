@@ -1,3 +1,3 @@
-export type { MappedEntry, EntryMapper } from './types.js';
-export { defaultMapper } from './default.js';
-export { createMongoMapper } from './mongo.js';
+export type { MappedEntry, EntryMapper } from './types.ts';
+export { defaultMapper } from './default.ts';
+export { createMongoMapper } from './mongo.ts';

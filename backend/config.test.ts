@@ -4,7 +4,7 @@ const readConfig = async (value: string | undefined) => {
   vi.resetModules();
   vi.stubEnv('DOTENV_CONFIG_PATH', '/dev/null');
   vi.stubEnv('BATCH_ON_FATAL_ERROR', value);
-  return (await import('./config.js')).default;
+  return (await import('./config.ts')).default;
 };
 
 afterEach(() => vi.unstubAllEnvs());

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { AuthConfigurationError, createTokenVerifier, resolvePowerSyncAuth } from './verifier/index.js';
-import { supplementsFromEnv } from './verifier/env.js';
-import type { TokenVerifier } from './types.js';
+import { AuthConfigurationError, createTokenVerifier, resolvePowerSyncAuth } from './verifier/index.ts';
+import { supplementsFromEnv } from './verifier/env.ts';
+import type { TokenVerifier } from './types.ts';
 
 // What the PowerSync export cannot tell the verifier comes from AUTH_* environment variables (see
 // supplementsFromEnv in ./verifier/env.ts), not from edits to this file: set them in the root `.env`
