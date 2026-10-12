@@ -39,7 +39,7 @@ Pass the complete response with its top-level `config` object. Keep it out of ve
 it can contain database settings and secret references. This repository ignores
 `powersync-config*.json` and excludes them from Docker images.
 
-Re-export and restart the backend after changing auth settings. The resolver may inspect
+Re-export after changing auth settings. The resolver may inspect
 replication settings to identify a Supabase project. If it infers Supabase from a database
 connection, verify separately that your PowerSync instance accepts those tokens too.
 
@@ -68,18 +68,16 @@ AUTH_INSTANCE_URL=https://your-instance.powersync.example.com
 | `AUTH_ALGORITHMS` | A narrower asymmetric allowlist than the RS/PS/ES/EdDSA default. |
 
 A value the loader cannot interpret (such as `AUTH_ALLOW_LOCAL_HTTP=yes`) stops startup with a
-message naming the variable. Restart the backend after changing any of them.
+message naming the variable.
 
-## File paths and startup
+## Auth file location and startup
 
-| Run mode | Environment file | Default auth file |
-| --- | --- | --- |
-| Docker Compose | Root `.env`, then `.env.local` (both loaded into the container; `.env` alone also feeds Compose interpolation) | `backend/powersync-config.json` on the host |
-| `pnpm --dir backend dev` or `start` | `backend/.env` | `backend/powersync-config.json` |
+The default auth file is `backend/powersync-config.json`. Which environment file the backend
+reads depends on how you run it; see the [README](../../../README.md#1-configure-the-database).
 
-For Compose, `POWERSYNC_CONFIG_PATH` in the root `.env` selects an absolute host path. Compose
-mounts that file at `/run/secrets/powersync-config.json` and sets the container's variable to
-the mounted path. A missing source file prevents the container from starting.
+With Docker Compose, `POWERSYNC_CONFIG_PATH` in the root `.env` selects an absolute host path.
+Compose mounts that file at `/run/secrets/powersync-config.json` and sets the container's variable
+to the mounted path. A missing source file prevents the container from starting.
 
 For local execution, the default path is relative to the verifier module. A custom
 `POWERSYNC_CONFIG_PATH` is resolved from the process working directory, normally `backend/`.
@@ -90,9 +88,9 @@ POWERSYNC_CONFIG_PATH=/absolute/path/to/powersync-config.json pnpm --dir backend
 ```
 
 Startup calls `initializeVerifier()` before listening. Invalid configuration produces
-`Cannot start.` and setup instructions. Remote JWKS endpoints are contacted on demand during
-verification, so startup does not test their availability. Configuration and inline keys are
-cached per process; restart after changing them. Remote keys refresh according to the cache policy.
+`Cannot start.` and setup instructions. Remote JWKS endpoints are contacted on demand, so startup
+does not test their availability. Configuration and inline keys are cached per process; restart
+after changing them. Remote keys refresh according to the cache policy.
 
 ## Self-hosted PowerSync
 
