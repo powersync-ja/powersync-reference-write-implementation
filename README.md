@@ -59,9 +59,7 @@ docker compose up --build
 The API listens at `http://localhost:6060`. Compose fixes both the container and host
 port to 6060; change its `ports` mapping to expose a different host port.
 
-Startup checks the database type, connection string, fatal-error policy, and verifier
-configuration. Remote JWKS keys are fetched when needed during token verification.
-A successful startup does not prove that every database operation or provider is reachable.
+Startup checks the database type, connection string, fatal-error policy, and verifier configuration.
 
 ### 4. Connect the client
 
@@ -118,8 +116,7 @@ pnpm --dir backend dev
 ```
 
 The local port defaults to 6060 and can be changed with `PORT` in `backend/.env`.
-Restart after changing auth configuration. Rebuild the image after code changes when
-using Compose without the development overlay.
+Rebuild the image after code changes when using Compose without the development overlay.
 
 ## Tests and API types
 
