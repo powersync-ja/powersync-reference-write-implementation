@@ -45,48 +45,30 @@ connection, verify separately that your PowerSync instance accepts those tokens 
 
 ### Supplements
 
-Supplements are environment variables, not source edits. Set them in the root `.env` (shared
-defaults) or `.env.local` (this machine; gitignored), or in `backend/.env` when running on the host.
-For a generic provider, for example:
+What the export cannot tell the verifier comes from `AUTH_*` environment variables, not from
+source edits. Set them in the root `.env` (shared defaults) or `.env.local` (this machine;
+gitignored), or in `backend/.env` when running on the host. Start with none and let the startup
+diagnostics tell you what is missing. List values are comma-separated; unset or blank means not
+supplied. For a generic provider, for example:
 
 ```sh
 AUTH_ISSUER=https://issuer.example.com
 AUTH_INSTANCE_URL=https://your-instance.powersync.example.com
 ```
 
-Use your provider's actual issuer and your actual PowerSync instance URL. Instead of
-`AUTH_INSTANCE_URL`, you can set `AUTH_AUDIENCE` to a comma-separated list of the intended
-accepted audiences, including any exported `additional_audiences`.
-
-Standard hosted Supabase configurations usually need no supplements. For a custom domain
-or ambiguous project detection, set `AUTH_PROVIDER=supabase` and `AUTH_SUPABASE_URL` as directed
-by the resolver. Unset or blank variables are simply not supplied.
-
-| Variable | Supplement |
+| Variable | When you need it |
 | --- | --- |
-| `AUTH_ISSUER` | `issuer` |
-| `AUTH_AUDIENCE` | `audience` (comma-separated) |
-| `AUTH_INSTANCE_URL` | `instanceUrl` |
-| `AUTH_SUPABASE_URL` | `supabaseUrl` |
-| `AUTH_PROVIDER` | `provider`: `supabase` or `generic` |
-| `AUTH_JWKS_URI` | `jwksUri` |
-| `AUTH_JWKS_URI_OVERRIDE` | `jwksUriOverride` (comma-separated) |
-| `AUTH_ALGORITHMS` | `algorithms` (comma-separated) |
-| `AUTH_ALLOW_LOCAL_HTTP` | `allowLocalHttp`: `true` or `false` |
-| `AUTH_ALLOW_INSECURE_HTTP_HOSTS` | `allowInsecureHttpHosts` (comma-separated) |
+| `AUTH_ISSUER` | Any generic (non-Supabase) provider. PowerSync never validates `iss`, so the expected issuer comes from your own settings, not the export. |
+| `AUTH_INSTANCE_URL` | Generic Cloud imports: your PowerSync instance URL is the default audience, and the export does not contain it. |
+| `AUTH_AUDIENCE` | Instead of `AUTH_INSTANCE_URL`, to state the accepted audiences explicitly. Must include any exported `additional_audiences`. |
+| `AUTH_PROVIDER=supabase`, `AUTH_SUPABASE_URL` | Supabase behind a custom domain, or when project detection is ambiguous. Standard hosted Supabase usually needs none. |
+| `AUTH_JWKS_URI` | The export has no key endpoint. It cannot override a different exported URI. |
+| `AUTH_JWKS_URI_OVERRIDE` | The exported endpoint is written from the PowerSync service's network view (for example `http://backend:6060/...`) and your backend reaches the keys at a different address. Inline public keys are unchanged. |
+| `AUTH_ALLOW_LOCAL_HTTP`, `AUTH_ALLOW_INSECURE_HTTP_HOSTS` | Plain HTTP key endpoints. HTTPS is required by default; `AUTH_ALLOW_LOCAL_HTTP=true` permits loopback, and other hosts must be named exactly (no wildcards). |
+| `AUTH_ALGORITHMS` | A narrower asymmetric allowlist than the RS/PS/ES/EdDSA default. |
 
 A value the loader cannot interpret (such as `AUTH_ALLOW_LOCAL_HTTP=yes`) stops startup with a
-message naming the variable. The table of when each is needed is in `verifier.ts`; the parsing is
-in `verifier/env.ts`. Restart the backend after changing any of them.
-
-For JWKS URLs, distinguish two settings:
-
-- `AUTH_JWKS_URI` supplies a missing endpoint; it cannot conflict with the exported endpoint.
-- `AUTH_JWKS_URI_OVERRIDE` replaces remote endpoints when the backend needs a different address.
-  It leaves inline public keys unchanged.
-
-HTTPS is required by default. For local development, `AUTH_ALLOW_LOCAL_HTTP=true` permits
-loopback HTTP endpoints. Other HTTP hosts require exact names in `AUTH_ALLOW_INSECURE_HTTP_HOSTS`.
+message naming the variable. Restart the backend after changing any of them.
 
 ## File paths and startup
 
