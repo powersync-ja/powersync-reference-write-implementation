@@ -1,5 +1,4 @@
 import { FatalOperationError } from '../../errors.ts';
-import { URL } from 'url';
 import PG from 'pg';
 import type { Persister, CrudEntry } from '../../types.ts';
 import { classifyPostgresError } from './postgres-errors.ts';
@@ -13,24 +12,43 @@ function escapeIdentifier(identifier: string): string {
   return `"${identifier.replace(/"/g, '""').replace(/\./g, '"."')}"`;
 }
 
-export const createPostgresPersister = (uri: string, mapper: EntryMapper = defaultMapper): Persister => {
+export interface PostgresPersisterOptions {
+  /**
+   * Extra pg pool settings, such as max, connectionTimeoutMillis (acquisition wait), and
+   * statement_timeout. Unset fields keep pg defaults. The connection string still supplies
+   * the host, credentials, database, and TLS options.
+   */
+  pool?: Omit<PG.PoolConfig, 'connectionString'>;
+  /**
+   * Runs inside each database transaction after BEGIN and before the first operation.
+   * Use transaction-local settings only, because connections are reused. Defaults to
+   * exposing the verified subject as app.user_id.
+   */
+  initializeTransaction?: (client: PG.PoolClient, auth: AuthContext) => Promise<void>;
+}
+
+/** Exposes the verified subject for this transaction as current_setting('app.user_id', true). */
+export const setAppUserId = async (client: PG.PoolClient, auth: AuthContext): Promise<void> => {
+  await client.query('SELECT set_config($1, $2, true)', ['app.user_id', auth.sub]);
+};
+
+export const createPostgresPersister = (
+  uri: string,
+  mapper: EntryMapper = defaultMapper,
+  options: PostgresPersisterOptions = {}
+): Persister & { end(): Promise<void> } => {
   console.debug('Using Postgres Persister');
 
-  const url = new URL(uri);
-
-  const pool = new Pool({
-    host: url.hostname,
-    database: url.pathname.split('/')[1],
-    user: url.username,
-    password: url.password,
-    port: parseInt(url.port)
-  });
+  const initializeTransaction = options.initializeTransaction ?? setAppUserId;
+  const pool = new Pool({ ...options.pool, connectionString: uri });
 
   pool.on('error', (err, client) => {
     console.error('Pool connection failure to postgres:', err, client);
   });
 
-  const persister: Persister = {
+  const persister = {
+    /** Closes the pool. Only needed where the process does not exit, such as tests. */
+    end: () => pool.end(),
     updateBatch: async (batch: CrudEntry[], auth: AuthContext) => {
       let client: PG.PoolClient;
       try {
@@ -38,13 +56,14 @@ export const createPostgresPersister = (uri: string, mapper: EntryMapper = defau
       } catch (error) {
         throw classifyPostgresError(error);
       }
+      // Set when rollback fails; the connection's state is unknown, so it is discarded.
+      let discard: Error | undefined;
       try {
         await client.query('BEGIN');
 
-        // Expose the verified subject for this transaction. Application RLS policies can read
-        // current_setting('app.user_id', true). Define policies for your tables as described
-        // in docs/authorization.md.
-        await client.query('SELECT set_config($1, $2, true)', ['app.user_id', auth.sub]);
+        // By default this exposes the verified subject to application RLS policies; see
+        // docs/authorization.md.
+        await initializeTransaction(client, auth);
 
         for (const [operationIndex, op] of batch.entries()) {
           try {
@@ -121,10 +140,14 @@ export const createPostgresPersister = (uri: string, mapper: EntryMapper = defau
         }
         await client.query('COMMIT');
       } catch (e) {
-        await client.query('ROLLBACK').catch(() => {});
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          discard = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+        }
         throw classifyPostgresError(e);
       } finally {
-        client.release();
+        client.release(discard);
       }
     }
   };

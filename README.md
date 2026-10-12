@@ -20,7 +20,7 @@ Edit the root `.env` for Docker Compose:
 | Variable | Meaning |
 | --- | --- |
 | `DATABASE_TYPE` | `postgres` (default), `mongodb`, `mysql`, or `mssql` |
-| `DATABASE_URI` | Required connection string for your source database |
+| `DATABASE_URI` | Required connection string for your source database. For Postgres, the full URI is passed to `pg`, so options such as `sslmode` apply |
 | `BATCH_ON_FATAL_ERROR` | `stop` (default) or `skip`; see [error handling](docs/error-handling.md) |
 
 `.env` is committed, so keep it to shared defaults. Put this machine's values and any secret, such

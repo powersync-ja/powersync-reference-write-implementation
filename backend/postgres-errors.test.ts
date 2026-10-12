@@ -22,7 +22,8 @@ describe('Postgres error classification', () => {
   it.each([
     ['23502', 'NOT_NULL_VIOLATION'],
     ['23505', 'UNIQUE_VIOLATION'],
-    ['42501', 'SCHEMA_MISMATCH'],
+    ['42501', 'UNAUTHORIZED'],
+    ['42P01', 'SCHEMA_MISMATCH'],
     ['28P01', 'UNCLASSIFIED_ERROR'],
     ['UNKNOWN_DRIVER_ERROR', 'UNCLASSIFIED_ERROR']
   ])('keeps permanent failure %s fatal', (code, errorCode) => {

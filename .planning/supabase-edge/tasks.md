@@ -26,10 +26,10 @@ Spike findings (CLI 2.98.2, edge-runtime 1.73.13 ≈ Deno 2.1.4; local Deno 2.7.
 - [x] `fatal-error-handler.ts`: Web Crypto `randomUUID`; callback scheduling is injected (Node fire-and-forget, Edge awaited). Done as `src/write/processor.ts` (`createTransactionProcessor`, `awaitDeadLetter` option) and `src/write/dead-letter.ts`; `fatal-error-handler.ts` re-exports the types and keeps the Node singleton
 
 **3. Postgres adapter hardening** (Node defaults unchanged)
-- [ ] Pass the full connection string through (TLS/query options, decoded credentials)
-- [ ] Optional pool, acquire, and statement timeouts; optional transaction-init hook
-- [ ] Discard the client when rollback fails; map 42501 to an authorization failure (`postgres-errors.test.ts`)
-- [ ] Optional cleanup seam for tests
+- [x] Pass the full connection string through (TLS/query options, decoded credentials)
+- [x] Optional pool, acquire, and statement timeouts; optional transaction-init hook
+- [x] Discard the client when rollback fails; map 42501 to an authorization failure (`postgres-errors.test.ts`)
+- [x] Optional cleanup seam for tests (`end()` on the returned persister; `PostgresPersisterOptions.pool` / `initializeTransaction`, default `setAppUserId`)
 
 **4. Edge validator**
 - [ ] Pick and lock a standalone validator generator; generate it from `powersync-reference-write-api.openapi.yaml` and commit the output

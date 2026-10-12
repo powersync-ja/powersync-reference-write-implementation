@@ -9,11 +9,16 @@ const db = vi.hoisted(() => ({
   persist: vi.fn(),
   connect: vi.fn(),
   begin: vi.fn(),
-  release: vi.fn()
+  release: vi.fn(),
+  poolConfig: vi.fn(),
+  setConfig: vi.fn()
 }));
 vi.mock('pg', () => ({
   default: {
     Pool: class {
+      constructor(config: unknown) {
+        db.poolConfig(config);
+      }
       on() {}
       async connect() {
         await db.connect();
@@ -22,7 +27,7 @@ vi.mock('pg', () => ({
             if (sql === 'COMMIT') return db.commit();
             if (sql === 'ROLLBACK') return db.rollback();
             if (sql === 'BEGIN') return db.begin();
-            if (sql.startsWith('SELECT set_config')) return;
+            if (sql.startsWith('SELECT set_config')) return db.setConfig(sql);
             return db.operation();
           },
           release: db.release
@@ -101,6 +106,8 @@ beforeEach(() => {
   db.connect.mockReset().mockResolvedValue(undefined);
   db.begin.mockReset().mockResolvedValue(undefined);
   db.release.mockReset();
+  db.poolConfig.mockReset();
+  db.setConfig.mockReset();
 });
 describe('Postgres connection recovery', () => {
   it.each(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', '08006'])(
@@ -126,6 +133,46 @@ describe('Postgres connection recovery', () => {
     await expect(persister.updateBatch(batch, auth)).rejects.toBeInstanceOf(RetryableError);
     expect(db.rollback).toHaveBeenCalledOnce();
     expect(db.release).toHaveBeenCalledOnce();
+  });
+  it('discards the connection when rollback fails', async () => {
+    db.operation.mockRejectedValueOnce(Object.assign(new Error('connection reset'), { code: 'ECONNRESET' }));
+    db.rollback.mockRejectedValueOnce(new Error('connection terminated'));
+    const persister = createPostgresPersister('postgres://user:pass@localhost:5432/db');
+    await expect(persister.updateBatch(batch, auth)).rejects.toBeInstanceOf(RetryableError);
+    expect(db.release).toHaveBeenCalledWith(expect.objectContaining({ message: 'connection terminated' }));
+  });
+  it('returns a healthy connection to the pool after rollback', async () => {
+    db.operation.mockRejectedValueOnce(Object.assign(new Error('duplicate'), { code: '23505' }));
+    const persister = createPostgresPersister('postgres://user:pass@localhost:5432/db');
+    await expect(persister.updateBatch(batch, auth)).rejects.toMatchObject({ errorCode: 'UNIQUE_VIOLATION' });
+    expect(db.release).toHaveBeenCalledWith(undefined);
+  });
+  it('passes the full connection string and pool settings to pg', () => {
+    const uri = 'postgres://us%40er:p%3Ass@db.example.com:6543/postgres?sslmode=verify-full';
+    createPostgresPersister(uri, defaultMapper, { pool: { max: 2, statement_timeout: 5000 } });
+    expect(db.poolConfig).toHaveBeenLastCalledWith({ connectionString: uri, max: 2, statement_timeout: 5000 });
+  });
+  it('sets app.user_id by default and runs a custom transaction initializer instead when given', async () => {
+    await createPostgresPersister('postgres://user:pass@localhost:5432/db').updateBatch(batch, auth);
+    expect(db.setConfig).toHaveBeenCalledOnce();
+
+    db.setConfig.mockReset();
+    const initializeTransaction = vi.fn().mockResolvedValue(undefined);
+    const persister = createPostgresPersister('postgres://user:pass@localhost:5432/db', defaultMapper, {
+      initializeTransaction
+    });
+    await persister.updateBatch(batch, auth);
+    expect(initializeTransaction).toHaveBeenCalledWith(expect.objectContaining({ query: expect.any(Function) }), auth);
+    expect(db.setConfig).not.toHaveBeenCalled();
+    expect(db.begin.mock.invocationCallOrder[1]).toBeLessThan(initializeTransaction.mock.invocationCallOrder[0]);
+  });
+  it('rolls back when transaction initialization fails', async () => {
+    const persister = createPostgresPersister('postgres://user:pass@localhost:5432/db', defaultMapper, {
+      initializeTransaction: () => Promise.reject(Object.assign(new Error('role missing'), { code: '42704' }))
+    });
+    await expect(persister.updateBatch(batch, auth)).rejects.toMatchObject({ errorCode: 'SCHEMA_MISMATCH' });
+    expect(db.rollback).toHaveBeenCalledOnce();
+    expect(db.operation).not.toHaveBeenCalled();
   });
   it('returns retryable_error through the actual API when acquiring a connection fails', async () => {
     const { fatalErrorHandler } = await import('./src/fatal-error-handler.ts');
