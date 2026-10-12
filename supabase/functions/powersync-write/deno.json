@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "@supabase/middleware": "npm:@supabase/middleware@1.0.0",
+    "@supabase/middleware/cors": "npm:@supabase/middleware@1.0.0/cors",
+    "@supabase/server/middleware/required-claims": "npm:@supabase/server@1.9.2/middleware/required-claims",
+    "pg": "npm:pg@8.13.0"
+  }
+}
