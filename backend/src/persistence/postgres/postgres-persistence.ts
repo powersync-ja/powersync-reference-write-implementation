@@ -1,5 +1,5 @@
 import { FatalOperationError } from '../../errors.js';
-import { URL } from 'url';
+import { assertNoQuoteCharacters } from '../identifiers.js';
 import PG from 'pg';
 import type { Persister, CrudEntry } from '../../types.js';
 import { classifyPostgresError } from './postgres-errors.js';
@@ -10,20 +10,21 @@ import type { AuthContext } from '../../auth/types.js';
 const { Pool } = PG;
 
 function escapeIdentifier(identifier: string): string {
-  return `"${identifier.replace(/"/g, '""').replace(/\./g, '"."')}"`;
+  assertNoQuoteCharacters(identifier, ['"']);
+  return `"${identifier.replace(/\./g, '"."')}"`;
 }
 
 export const createPostgresPersister = (uri: string, mapper: EntryMapper = defaultMapper): Persister => {
   console.debug('Using Postgres Persister');
 
-  const url = new URL(uri);
-
+  // pg parses the connection string itself: percent-encoded credentials are decoded, a missing
+  // port defaults to 5432, and sslmode (e.g. ?sslmode=require) is honoured.
   const pool = new Pool({
-    host: url.hostname,
-    database: url.pathname.split('/')[1],
-    user: url.username,
-    password: url.password,
-    port: parseInt(url.port)
+    connectionString: uri,
+    max: 10,
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000,
+    statement_timeout: 30_000
   });
 
   pool.on('error', (err, client) => {
