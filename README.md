@@ -138,5 +138,3 @@ Tests use local fixtures and mocks; they need permission to open local listening
 but no Docker, running database, or live identity provider. Type generation updates both
 `backend/src/generated/api.ts` and `example-client/src/generated/api.d.ts` from the OpenAPI
 spec. Run it after editing the spec.
-
-[The manual checklist](docs/manual-test-plan.md) provides a separate Postgres test setup.
