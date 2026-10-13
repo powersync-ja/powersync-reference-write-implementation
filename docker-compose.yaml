@@ -1,6 +1,6 @@
 # The write API, standalone. Assumes a hosted PowerSync instance and a database you already run —
 # this project owns neither. Set DATABASE_TYPE / DATABASE_URI in .env and export the instance's
-# auth config as described in backend/src/auth/SETUP.md.
+# auth config as described in docs/auth/setup.md.
 
 services:
   backend:

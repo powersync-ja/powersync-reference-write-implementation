@@ -2,7 +2,7 @@ MANUAL TEST PLAN — PowerSync Reference Write Implementation
 
 Run commands from the repository root unless stated otherwise. Use a disposable
 Postgres database. You need a PowerSync auth export and a current token from the identity
-provider it trusts (see backend/src/auth/SETUP.md). These checks do not test replication
+provider it trusts (see docs/auth/setup.md). These checks do not test replication
 or client sync.
 
 Record your starting git status and preserve any existing local changes. The steps
@@ -65,7 +65,7 @@ Prerequisites: Docker Desktop, Node.js 24, pnpm 9, curl, and Python 3.
     Use Docker Desktop's host.docker.internal here. Other Docker environments need
     an equivalent host address. Leave POWERSYNC_CONFIG_PATH unset to use the default.
 
-[ ] Configure authentication as described in backend/src/auth/SETUP.md: export your
+[ ] Configure authentication as described in docs/auth/setup.md: export your
     PowerSync configuration to backend/powersync-config.json and set any AUTH_* supplements
     in the root .env.
 

@@ -15,13 +15,13 @@ export interface Authorizer {
 
 /**
  * Allows all authenticated writes. Replace this implementation with your application's
- * authorization checks. See docs/authorization.md.
+ * authorization checks. See docs/auth/authorization.md.
  */
 export const authorizer: Authorizer = {
   async authorize(_crud, _auth) {
     console.error(
       'Authorization is not configured. All authenticated writes are allowed. ' +
-        'Configure backend/src/auth/authorizer.ts; see docs/authorization.md.'
+        'Configure backend/src/auth/authorizer.ts; see docs/auth/authorization.md.'
     );
     return true;
   }

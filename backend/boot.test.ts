@@ -82,7 +82,7 @@ describe('refusing to start on bad configuration', () => {
     expect(output).toContain('Cannot start.');
     expect(output).toContain(diagnostic);
     expect(output).toContain('POWERSYNC_CONFIG_PATH');
-    expect(output).toContain('SETUP.md');
+    expect(output).toContain('docs/auth/setup.md');
     expect(output).not.toContain('do-not-print-this');
     expect(output).not.toMatch(/^\s+at .+/m);
   });
