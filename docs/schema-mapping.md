@@ -50,7 +50,7 @@ default mapper. Restart the backend after adding or changing validators.
   timestamps or booleans. For MongoDB, see `collectionSchemaFromJsonSchema` in `mongo-schema.ts`.
 - **Set server-controlled fields.** Add or overwrite values such as `updated_at`.
   For ownership fields such as `owner_id` and `created_by`, see
-  [authorization](authorization.md). The mapper does not receive the verified identity.
+  [authorization](auth/authorization.md). The mapper does not receive the verified identity.
 - **Remove fields.** Omit fields that the database does not store or clients may not write.
 
 ## Writing and installing a custom mapper

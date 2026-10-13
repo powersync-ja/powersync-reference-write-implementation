@@ -9,14 +9,14 @@ API which will support most simple use-cases.  It provides extension points that
 the behavior to your own requirements, or you can modify it to suit your specific case.
 
 - [backend/powersync-reference-write-api.openapi.yaml](backend/powersync-reference-write-api.openapi.yaml) provides a simple but flexible API definition that serves as a contract between frontend and backend.
-- A reference `uploadData` implementation handles most common workflows and will marshal queued changes to the format specified by the API definition.
-- A reference backend accepts API requests from the front-end and writes them to your source database. This includes an Express API, adapters for Postgres, MongoDB, MySQL, and SQL Server.
+- A [reference implementation](example-client/src/PowersyncConnector.ts) of `uploadData` handles most common workflows. It will marshal queued changes to the format specified by the API definition. A [single-file version](example-client/src/PowersyncConnector.singlefile.ts) is provided for ease of copy-paste.
+- A [reference backend](backend) accepts API requests from the front-end and writes them to your source database. This includes an Express API, adapters for Postgres, MongoDB, MySQL, and SQL Server.
 
 You supply the database, PowerSync instance, client application, and application-specific authorization, and you must copy the example `uploadData` implementation to your front-end code.
 
 ## Setup
 
-Run the commands below from the repository root. Docker Compose runs the backend;
+Run the commands below from the repository root. `docker compose` runs the backend;
 local development and tests use Node.js 24 and pnpm 9.
 
 ### 1. Configure the database
@@ -30,12 +30,12 @@ Set these in `.env.local` (or the root `.env` for shared defaults) for Docker Co
 | `BATCH_ON_FATAL_ERROR` | `stop` (default) or `skip`; see [error handling](docs/error-handling.md) |
 
 `.env` is committed, so keep it to shared defaults. Put this machine's values and any secret, such
-as a `DATABASE_URI` with a password, in a `.env.local` beside it: it is gitignored, optional, and
+as a `DATABASE_URI` with a password, in `.env.local`. This is gitignored, optional, and
 overrides `.env`. Compose passes both files to the container, so `docker compose up` needs no extra
 flags.
 
 Use the database that your PowerSync instance already replicates. Tables and columns
-must match uploaded operations unless you add [schema mapping](docs/schema-mapping.md).
+must match uploaded operations unless you add custom [schema mapping](docs/schema-mapping.md).
 The default MongoDB mapper also requires collection `$jsonSchema` validators.
 
 In Docker Desktop, use `host.docker.internal` to reach a database on the host.
@@ -44,17 +44,26 @@ such as `localhost`. Other Docker environments may require a host-gateway config
 
 ### 2. Configure authentication
 
-Follow [the auth setup guide](backend/src/auth/SETUP.md). The default backend reads a
-PowerSync Cloud export from `backend/powersync-config.json`; generic providers also
-need `AUTH_ISSUER` and `AUTH_INSTANCE_URL` (or `AUTH_AUDIENCE`) set in `.env.local`.
+The backend does not issue tokens. It accepts only tokens signed by keys this configuration
+trusts, normally the same provider your PowerSync instance trusts, so clients authenticate
+with the same provider. The default `backend/src/auth/verifier.ts` reads a PowerSync Cloud
+JSON export, resolves its authentication settings, and builds a verifier. It may need
+additional trusted settings, such as the expected issuer or audience.
 
+Choose an integration:
+
+- **PowerSync Cloud:** export your config to `backend/powersync-config.json` and set any
+  `AUTH_*` supplements; see [auth setup](docs/auth/setup.md). Supabase with asymmetric
+  signing keys is supported by this path.
+- **Self-hosted PowerSync:** adapt the loader to use `resolveSelfHostedAuth`, as described in
+  [auth setup](docs/auth/setup.md#self-hosted-powersync). The default loader does not read
+  YAML or detect self-hosted configuration automatically.
+- **Custom provider:** preserve the startup and request exports when replacing the verifier.
+  See [Supabase and Clerk integration](docs/auth/verifiers.md).
+
+The export commands require the [PowerSync CLI](https://docs.powersync.com/tools/cli).
 Compose mounts the export read-only. To use a different file, set `POWERSYNC_CONFIG_PATH`
 to its absolute host path in the root `.env`. The file must exist before starting Compose.
-
-For Supabase or Clerk, see [provider integration](docs/auth-verifiers.md). Self-hosted
-PowerSync requires adapting the verifier loader as described in the setup guide.
-The backend does not issue tokens. It only accepts tokens signed by keys your auth config
-trusts, so clients authenticate with the same provider your PowerSync instance uses.
 
 ### 3. Start the API
 
@@ -83,7 +92,7 @@ computer or phone needs the backend's network address or a tunnel URL.
 
 The default authorizer allows all authenticated writes. Add your application's checks in
 [`backend/src/auth/authorizer.ts`](backend/src/auth/authorizer.ts); see
-[authorization](docs/authorization.md). Configure your PowerSync sync streams or rules
+[authorization](docs/auth/authorization.md). Configure your PowerSync sync streams or rules
 separately to control which rows each user can read.
 
 [Schema mapping](docs/schema-mapping.md) describes field conversion and custom writes.

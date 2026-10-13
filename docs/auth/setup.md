@@ -1,24 +1,7 @@
-# Configuring token verification
+# Authentication setup
 
-The default `backend/src/auth/verifier.ts` reads a PowerSync Cloud JSON export, resolves
-its authentication settings, and builds a verifier. It may need additional trusted
-settings, such as the expected issuer or audience.
-
-The backend does not issue tokens. It accepts only tokens signed by keys this configuration
-trusts, normally the same provider your PowerSync instance trusts.
-
-## Choose an integration
-
-- **PowerSync Cloud:** use the export and supplements below. Supabase with asymmetric
-  signing keys is supported by this path.
-- **Self-hosted PowerSync:** adapt the loader to use `resolveSelfHostedAuth`, as shown below.
-  The default loader does not read YAML or detect self-hosted configuration automatically.
-- **Custom provider:** preserve the startup and request exports when replacing the verifier.
-  See [Supabase and Clerk integration](../../../docs/auth-verifiers.md).
-
-Use Node.js 24 and pnpm 9 for local development and tests. Install backend dependencies
-with `pnpm --dir backend install` from the repository root. The export commands also require
-the [PowerSync CLI](https://docs.powersync.com/tools/cli).
+Details for the auth step in the [README](../../README.md#2-configure-authentication). The
+export commands require the [PowerSync CLI](https://docs.powersync.com/tools/cli).
 
 ## PowerSync Cloud export
 
@@ -73,7 +56,7 @@ message naming the variable.
 ## Auth file location and startup
 
 The default auth file is `backend/powersync-config.json`. Which environment file the backend
-reads depends on how you run it; see the [README](../../../README.md#1-configure-the-database).
+reads depends on how you run it; see the [README](../../README.md#1-configure-the-database).
 
 With Docker Compose, `POWERSYNC_CONFIG_PATH` in the root `.env` selects an absolute host path.
 Compose mounts that file at `/run/secrets/powersync-config.json` and sets the container's variable
@@ -148,7 +131,7 @@ requires updating the file and restarting.
 The built-in resolver supports one issuer and one audience policy per verifier. It rejects
 symmetric keys, private keys, legacy Supabase secrets, and configurations with no supported
 verification keys. PowerSync temporary tokens are excluded. Clerk session tokens without
-`aud` need the custom integration in [the provider guide](../../../docs/auth-verifiers.md).
+`aud` need the custom integration in [the provider guide](verifiers.md).
 
-Authentication does not restrict writes. Add [authorization](../../../docs/authorization.md)
+Authentication does not restrict writes. Add [authorization](authorization.md)
 using trusted identity and permissions, and configure sync access separately.
