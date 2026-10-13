@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FatalOperationError } from './src/errors.js';
-import { assertSafeIdentifier, assertSafeTransaction, MAX_IDENTIFIER_LENGTH } from './src/persistence/identifiers.js';
+import { FatalOperationError } from './src/errors.ts';
+import { assertSafeIdentifier, assertSafeTransaction, MAX_IDENTIFIER_LENGTH } from './src/persistence/identifiers.ts';
 
 describe('assertSafeIdentifier', () => {
   it.each(['todos', 'Todo_Items', '_private', 'a1', 'a'.repeat(MAX_IDENTIFIER_LENGTH)])('accepts %s', (name) => {

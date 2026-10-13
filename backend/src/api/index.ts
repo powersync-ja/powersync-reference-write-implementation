@@ -1,7 +1,7 @@
 import express from 'express';
-import { dataRouter } from './data.js';
-import { requireAuth } from '../auth/middleware.js';
-import { verifier } from '../auth/verifier.js';
+import { dataRouter } from './data.ts';
+import { requireAuth } from '../auth/middleware.ts';
+import { verifier } from '../auth/verifier.ts';
 
 const router = express.Router();
 

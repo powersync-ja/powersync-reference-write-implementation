@@ -1,4 +1,4 @@
-import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.js';
+import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.ts';
 
 const MYSQL_ERRNOS: Record<number, ErrorCode> = {
   1048: 'NOT_NULL_VIOLATION',

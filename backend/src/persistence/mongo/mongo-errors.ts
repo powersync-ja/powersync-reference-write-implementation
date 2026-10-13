@@ -1,4 +1,4 @@
-import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.js';
+import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.ts';
 
 const MONGO_CODES: Record<number, ErrorCode> = {
   121: 'DOCUMENT_VALIDATION_FAILURE',

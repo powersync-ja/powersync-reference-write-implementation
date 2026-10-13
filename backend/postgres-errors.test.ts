@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPostgresError } from './src/persistence/postgres/postgres-errors.js';
-import { FatalOperationError, RetryableError } from './src/errors.js';
+import { classifyPostgresError } from './src/persistence/postgres/postgres-errors.ts';
+import { FatalOperationError, RetryableError } from './src/errors.ts';
 
 describe('Postgres error classification', () => {
   it.each([

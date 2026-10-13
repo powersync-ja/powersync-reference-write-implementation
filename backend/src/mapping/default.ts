@@ -1,4 +1,4 @@
-import type { EntryMapper } from './types.js';
+import type { EntryMapper } from './types.ts';
 
 /**
  * Preserves table and field names without converting or validating values.

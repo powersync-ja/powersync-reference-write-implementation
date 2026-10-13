@@ -1,9 +1,9 @@
 import {
   algorithmPolicy, Diagnostics, inlineSource, overrideUris, remoteSources, resolved,
   supplementShapes, transport,
-} from './policy.js';
-import type { AuthSupplements, KeySource, ResolutionResult } from './types.js';
-import { keyUrl, nonempty, object, strings } from './validation.js';
+} from './policy.ts';
+import type { AuthSupplements, KeySource, ResolutionResult } from './types.ts';
+import { keyUrl, nonempty, object, strings } from './validation.ts';
 
 const JWKS_PATH = '/auth/v1/.well-known/jwks.json';
 const PROJECT_HOST = /^([a-z0-9-]+)\.supabase\.co$/;

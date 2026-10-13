@@ -1,5 +1,5 @@
-import type { CrudEntry } from '../types.js';
-import type { AuthContext } from './types.js';
+import type { CrudEntry } from '../types.ts';
+import type { AuthContext } from './types.ts';
 
 /**
  * Checks whether an authenticated caller may apply a transaction.

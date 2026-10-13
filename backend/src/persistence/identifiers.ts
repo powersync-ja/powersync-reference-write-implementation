@@ -1,5 +1,5 @@
-import { FatalOperationError } from '../errors.js';
-import type { CrudEntry } from '../types.js';
+import { FatalOperationError } from '../errors.ts';
+import type { CrudEntry } from '../types.ts';
 
 // Letters, digits and underscores, not starting with a digit. Deliberately excludes dots (schema
 // traversal), quotes, brackets, whitespace and `$` (MongoDB operators).
