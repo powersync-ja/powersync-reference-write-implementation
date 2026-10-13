@@ -112,18 +112,18 @@ describe('verifier configured only through the environment', () => {
 
 describe('authModeFromEnv', () => {
   it('defaults to cloud and accepts the two modes', () => {
-    expect(authModeFromEnv({})).toBe('cloud');
-    expect(authModeFromEnv({ AUTH_MODE: ' ' })).toBe('cloud');
-    expect(authModeFromEnv({ AUTH_MODE: 'cloud' })).toBe('cloud');
-    expect(authModeFromEnv({ AUTH_MODE: 'self-hosted' })).toBe('self-hosted');
+    expect(authModeFromEnv({})).toBe('file');
+    expect(authModeFromEnv({ AUTH_MODE: ' ' })).toBe('file');
+    expect(authModeFromEnv({ AUTH_MODE: 'file' })).toBe('file');
+    expect(authModeFromEnv({ AUTH_MODE: 'env' })).toBe('env');
   });
 
   it('rejects anything else, naming the variable', () => {
-    expect(() => authModeFromEnv({ AUTH_MODE: 'selfhosted' })).toThrow(/AUTH_MODE/);
+    expect(() => authModeFromEnv({ AUTH_MODE: 'self-hosted' })).toThrow(/AUTH_MODE/);
   });
 });
 
-describe('AUTH_MODE=self-hosted', () => {
+describe('AUTH_MODE=env', () => {
   const jwksUri = 'https://issuer.example.com/.well-known/jwks.json';
 
   async function sign(env: Record<string, string>) {
@@ -132,9 +132,9 @@ describe('AUTH_MODE=self-hosted', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(jwks), {
       headers: { 'content-type': 'application/json' }
     })));
-    vi.stubEnv('AUTH_MODE', 'self-hosted');
-    // No export file exists: self-hosted mode must not read one.
-    vi.stubEnv('POWERSYNC_CONFIG_PATH', '/missing-export-for-self-hosted-test.json');
+    vi.stubEnv('AUTH_MODE', 'env');
+    // No export file exists: env mode must not read one.
+    vi.stubEnv('POWERSYNC_CONFIG_PATH', '/missing-export-for-env-mode-test.json');
     for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
     return ({ iss, aud }: { iss: string; aud: string }) =>
       new SignJWT({}).setProtectedHeader({ alg: 'RS256', kid: 'k1' }).setSubject('user-1').setIssuer(iss)
@@ -187,7 +187,7 @@ describe('AUTH_MODE=self-hosted', () => {
   });
 });
 
-describe('AUTH_MODE=self-hosted without an audience (Clerk session tokens)', () => {
+describe('AUTH_MODE=env without an audience (Clerk session tokens)', () => {
   const jwksUri = 'https://issuer.example.com/.well-known/jwks.json';
 
   async function setup(env: Record<string, string>) {
@@ -196,7 +196,7 @@ describe('AUTH_MODE=self-hosted without an audience (Clerk session tokens)', () 
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(jwks), {
       headers: { 'content-type': 'application/json' }
     })));
-    vi.stubEnv('AUTH_MODE', 'self-hosted');
+    vi.stubEnv('AUTH_MODE', 'env');
     vi.stubEnv('AUTH_ISSUER', 'https://issuer.example.com');
     vi.stubEnv('AUTH_JWKS_URI', jwksUri);
     for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
@@ -244,5 +244,42 @@ describe('AUTH_MODE=self-hosted without an audience (Clerk session tokens)', () 
       .rejects.toMatchObject({ code: 'INVALID_TOKEN' });
     await expect(verifier.verify(await mint({ azp: 'https://other.example.com', aud: 'powersync-app' })))
       .rejects.toMatchObject({ code: 'INVALID_TOKEN' });
+  });
+});
+
+describe('AUTH_MODE=file with a self-hosted service config', () => {
+  async function withConfigFile<T>(contents: unknown, run: (privateKey: CryptoKey) => Promise<T>) {
+    const directory = await mkdtemp(path.join(tmpdir(), 'powersync-verifier-file-'));
+    try {
+      const configPath = path.join(directory, 'service.json');
+      const { privateKey, publicKey } = await generateKeyPair('RS256');
+      const jwk = { ...(await exportJWK(publicKey)), kid: 'k1', alg: 'RS256' };
+      await writeFile(configPath, JSON.stringify(typeof contents === 'function' ? contents(jwk) : contents));
+      vi.stubEnv('POWERSYNC_CONFIG_PATH', configPath);
+      vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Tests must not fetch remote keys'); }));
+      return await run(privateKey as CryptoKey);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+
+  it('verifies against inline keys, which an env-only setup cannot express', async () => {
+    await withConfigFile((jwk: unknown) => ({ client_auth: { jwks: { keys: [jwk] }, audience: ['powersync-app'] } }), async (privateKey) => {
+      vi.stubEnv('AUTH_ISSUER', 'https://issuer.example.com');
+      const { initializeVerifier, verifier } = await import('./src/auth/verifier.js');
+      await initializeVerifier();
+      const token = await new SignJWT({}).setProtectedHeader({ alg: 'RS256', kid: 'k1' }).setSubject('user-1')
+        .setIssuer('https://issuer.example.com').setAudience('powersync-app').setExpirationTime('5m').sign(privateKey);
+      await expect(verifier.verify(token)).resolves.toMatchObject({ sub: 'user-1' });
+    });
+  });
+
+  it('rejects a file that is neither a Cloud export nor a service config', async () => {
+    await withConfigFile({ something: 'else' }, async () => {
+      const { initializeVerifier } = await import('./src/auth/verifier.js');
+      const failure = await initializeVerifier().catch((error: unknown) => error);
+      expect(failure).toMatchObject({ code: 'AUTH_CONFIGURATION' });
+      expect((failure as Error).message).toContain('client_auth');
+    });
   });
 });

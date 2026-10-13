@@ -44,8 +44,8 @@ identity on the backend; use the provider user ID in your application's ownershi
 
 ## Clerk
 
-There are two token choices. Either way the backend uses `AUTH_MODE=self-hosted`; see
-[auth setup](setup.md#self-hosted-powersync-or-any-other-provider).
+There are two token choices. Either way the backend uses `AUTH_MODE=env`; see
+[auth setup](setup.md#environment-variables-only).
 
 - A [Clerk JWT template](https://clerk.com/docs/guides/sessions/jwt-templates) containing an `aud`
   accepted by PowerSync, used for both sync and writes.
@@ -59,7 +59,7 @@ JWKS, following [custom authentication](https://docs.powersync.com/configuration
 Then set the following in the root `.env` or `.env.local`:
 
 ```dotenv
-AUTH_MODE=self-hosted
+AUTH_MODE=env
 AUTH_ISSUER=https://<your-frontend-api>.clerk.accounts.dev
 AUTH_AUDIENCE=<the template's aud>
 AUTH_JWKS_URI=https://<your-frontend-api>.clerk.accounts.dev/.well-known/jwks.json
@@ -86,7 +86,7 @@ origin of the app that obtained the token. See [Clerk's verification guide](http
 Turn the audience check off and list your allowed origins:
 
 ```dotenv
-AUTH_MODE=self-hosted
+AUTH_MODE=env
 AUTH_ISSUER=https://<your-frontend-api>.clerk.accounts.dev
 AUTH_JWKS_URI=https://<your-frontend-api>.clerk.accounts.dev/.well-known/jwks.json
 AUTH_REQUIRE_AUDIENCE=false

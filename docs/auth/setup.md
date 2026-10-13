@@ -1,117 +1,82 @@
 # Authentication setup
 
 Details for the auth step in the [README](../../README.md#2-configure-authentication). The
-export commands require the [PowerSync CLI](https://docs.powersync.com/tools/cli).
+backend gets its verification settings from a PowerSync config file (the default) or from
+environment variables alone (`AUTH_MODE=env`). Set variables in `.env` or `.env.local` (or
+`backend/.env` when running on the host).
 
-## PowerSync Cloud export
+## Config file (default)
 
+The file is `backend/config/powersync-config.json`. It is either a PowerSync Cloud export or the
+`client_auth` section of a self-hosted service config; the backend recognises which from its shape.
+Keep it out of version control: it can contain database settings and secret references. This
+repository ignores `powersync-config*.json` and excludes it from Docker images.
 
-The export commands require the [PowerSync CLI](https://docs.powersync.com/tools/cli).
-
-From the repository root, export directly to the path the backend expects:
+**PowerSync Cloud.** Export your instance's config with the [PowerSync CLI](https://docs.powersync.com/tools/cli),
+so the same tokens work for the read and write paths:
 
 ```sh
 powersync login
 powersync fetch config --instance-id="<instance-id>" --output=json > backend/config/powersync-config.json
 ```
 
-To use a different directory with Docker Compose, set `POWERSYNC_CONFIG_DIR` in the root `.env`;
-the file inside must be named `powersync-config.json`.
-
 Alternatively, run `powersync link cloud --instance-id="<instance-id>"` once, then omit the
-instance flag on later exports. If your installed CLI also requires organization or project
-IDs, pass `--org-id` and `--project-id`; use `powersync fetch config --help` to inspect its flags.
+instance flag on later exports. If your CLI also requires `--org-id` and `--project-id`, see
+`powersync fetch config --help`. Save the complete response, with its top-level `config` object,
+and re-export after changing auth settings. The backend may infer a Supabase project from the
+replication settings; if it does, verify separately that your PowerSync instance accepts those
+tokens too. Usual variables: `AUTH_ISSUER` and `AUTH_INSTANCE_URL`, or `AUTH_PROVIDER` /
+`AUTH_SUPABASE_URL` for Supabase on a custom domain.
 
-Pass the complete response with its top-level `config` object. Keep it out of version control;
-it can contain database settings and secret references. This repository ignores
-`powersync-config*.json` and excludes them from Docker images.
+**Self-hosted PowerSync.** Save your service config with `client_auth` at the top level, with
+inline keys (`jwks`) or a key endpoint (`jwks_uri`) and your audience list:
 
-Re-export after changing auth settings. The resolver may inspect
-replication settings to identify a Supabase project. If it infers Supabase from a database
-connection, verify separately that your PowerSync instance accepts those tokens too.
-
-### Supplements
-
-What the export cannot tell the verifier comes from `AUTH_*` environment variables, not from
-source edits. Set them in the root `.env` (shared defaults) or `.env.local` (this machine;
-gitignored), or in `backend/.env` when running on the host. Start with none and let the startup
-diagnostics tell you what is missing. List values are comma-separated; unset or blank means not
-supplied. For a generic provider, for example:
-
-```sh
-AUTH_ISSUER=https://issuer.example.com
-AUTH_INSTANCE_URL=https://your-instance.powersync.example.com
+```json
+{
+  "client_auth": {
+    "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
+    "audience": ["powersync-app"]
+  }
+}
 ```
 
-| Variable | When you need it |
-| --- | --- |
-| `AUTH_ISSUER` | Any generic (non-Supabase) provider. PowerSync never validates `iss`, so the expected issuer comes from your own settings, not the export. |
-| `AUTH_INSTANCE_URL` | Generic Cloud imports: your PowerSync instance URL is the default audience, and the export does not contain it. |
-| `AUTH_AUDIENCE` | Instead of `AUTH_INSTANCE_URL`, to state the accepted audiences explicitly. Must include any exported `additional_audiences`. |
-| `AUTH_MODE=self-hosted` | No PowerSync Cloud export; see [self-hosted](#self-hosted-powersync-or-any-other-provider). |
-| `AUTH_PROVIDER=supabase`, `AUTH_SUPABASE_URL` | Supabase behind a custom domain, or when project detection is ambiguous. Standard hosted Supabase usually needs none. |
-| `AUTH_JWKS_URI` | The export has no key endpoint. It cannot override a different exported URI. |
-| `AUTH_JWKS_URI_OVERRIDE` | The exported endpoint is written from the PowerSync service's network view (for example `http://backend:6060/...`) and your backend reaches the keys at a different address. Inline public keys are unchanged. |
-| `AUTH_ALLOW_LOCAL_HTTP`, `AUTH_ALLOW_INSECURE_HTTP_HOSTS` | Plain HTTP key endpoints. HTTPS is required by default; `AUTH_ALLOW_LOCAL_HTTP=true` permits loopback, and other hosts must be named exactly (no wildcards). |
-| `AUTH_ALGORITHMS` | A narrower asymmetric allowlist than the RS/PS/ES/EdDSA default. |
+PowerSync never checks `iss`, so also set `AUTH_ISSUER`. Do not set the Cloud-only variables
+marked below.
 
-A value the loader cannot interpret (such as `AUTH_ALLOW_LOCAL_HTTP=yes`) stops startup with a
-message naming the variable.
+## Environment variables only
 
-## Auth file location and startup
-
-The default auth file is `backend/config/powersync-config.json`. Which environment file the backend
-reads depends on how you run it; see the [README](../../README.md#1-configure-the-database).
-
-With Docker Compose, `POWERSYNC_CONFIG_DIR` in the root `.env` selects the host directory holding
-`powersync-config.json` (default `backend/config/`). Compose mounts that directory read-only at
-`/app/config` and sets the container's `POWERSYNC_CONFIG_PATH` to the file inside it. A
-missing file stops the backend with a setup message, except in `AUTH_MODE=self-hosted`, which
-ignores it.
-
-For local execution, the default path is relative to the verifier module. A custom
-`POWERSYNC_CONFIG_PATH` is resolved from the process working directory, normally `backend/`.
-For example, from the repository root:
+Set `AUTH_MODE=env` and the backend reads no file. It suits any provider with a JWKS endpoint,
+such as Clerk, Auth0 or Supabase (see [Supabase and Clerk](providers.md)):
 
 ```sh
-POWERSYNC_CONFIG_PATH=/absolute/path/to/powersync-config.json pnpm --dir backend start
-```
-
-Startup calls `initializeVerifier()` before listening. Invalid configuration produces
-`Cannot start.` and setup instructions. Remote JWKS endpoints are contacted on demand, so startup
-does not test their availability. Configuration and inline keys are cached per process; restart
-after changing them. Remote keys refresh according to the cache policy.
-
-## Self-hosted PowerSync (or any other provider)
-
-Set `AUTH_MODE=self-hosted` to configure the verifier from environment variables alone. No
-export file is read and no code needs editing. Copy the values from the `client_auth` section of
-your PowerSync service configuration, in the root `.env`, `.env.local`, or `backend/.env`:
-
-```sh
-AUTH_MODE=self-hosted
+AUTH_MODE=env
 AUTH_ISSUER=https://issuer.example.com
 AUTH_AUDIENCE=powersync-app
 AUTH_JWKS_URI=https://issuer.example.com/.well-known/jwks.json
 ```
 
-| Variable | Meaning |
-| --- | --- |
-| `AUTH_JWKS_URI` | Required. Your provider's key endpoint (`client_auth.jwks_uri`). |
-| `AUTH_ISSUER` | Required. PowerSync never checks `iss`, so state the issuer you expect. |
-| `AUTH_AUDIENCE` | Required unless `AUTH_REQUIRE_AUDIENCE=false`. The complete accepted audience list, comma-separated (`client_auth.audience`). |
-| `AUTH_REQUIRE_AUDIENCE`, `AUTH_AUTHORIZED_PARTIES` | Optional. For tokens without `aud` (Clerk session tokens): set `AUTH_REQUIRE_AUDIENCE=false` and list the accepted `azp` origins, comma-separated. Dropping the audience requires the `azp` list; with an audience, the list adds a further check. |
-| `AUTH_JWKS_URI_OVERRIDE` | Optional. Read keys from this address instead, when the backend reaches the provider differently than PowerSync does. |
+These three are required (the audience unless `AUTH_REQUIRE_AUDIENCE=false`). Inline public keys
+cannot be given through variables; use a config file for them.
 
-The other `AUTH_*` variables for HTTP trust and algorithms apply as well. `AUTH_INSTANCE_URL`,
-`AUTH_SUPABASE_URL` and `AUTH_PROVIDER=supabase` are Cloud-only and are rejected in this mode.
+## Variables
 
-Inline public keys (`client_auth.jwks`) cannot be given through variables. If your provider
-publishes no key endpoint, adapt `backend/src/auth/verifier.ts` to call `resolveSelfHostedAuth`
-with a service configuration that contains them. The resolver does not support the self-hosted
-`supabase: true` mode's separate audience policy. For Supabase, set `AUTH_JWKS_URI` to the
-project's `/auth/v1/.well-known/jwks.json`, `AUTH_AUDIENCE=authenticated` and `AUTH_ISSUER` to
-the project's `/auth/v1` URL. See [PowerSync's manual configuration](https://docs.powersync.com/configuration/auth/supabase-auth#manual-jwks-configuration).
+Invalid values stop startup with a message naming the variable. Lists are comma-separated, and
+unset or blank means not set.
+
+| Variable | Applies to | Meaning |
+| --- | --- | --- |
+| `AUTH_MODE` | all | `file` (default) or `env`. |
+| `AUTH_ISSUER` | all | Expected token issuer. Required except for standard Supabase. PowerSync never checks `iss`, so it comes from your settings, not the file. |
+| `AUTH_AUDIENCE` | all | Accepted audiences, the complete list. Required in `env` mode. For a Cloud export, an alternative to `AUTH_INSTANCE_URL`; it must include any exported `additional_audiences`. |
+| `AUTH_JWKS_URI` | `env` | Required. Your provider's key endpoint. |
+| `AUTH_INSTANCE_URL` | Cloud export | Your PowerSync instance URL, the default audience for generic providers. The export does not contain it. |
+| `AUTH_PROVIDER=supabase`, `AUTH_SUPABASE_URL` | Cloud export | Supabase behind a custom domain, or when project detection is ambiguous. Standard hosted Supabase needs neither. |
+| `AUTH_REQUIRE_AUDIENCE`, `AUTH_AUTHORIZED_PARTIES` | `env`, self-hosted file | For tokens without `aud` (Clerk session tokens): set `AUTH_REQUIRE_AUDIENCE=false` and list the accepted `azp` origins. Dropping the audience requires the `azp` list; with an audience, the list adds a further check. |
+| `AUTH_JWKS_URI_OVERRIDE` | all | Read keys from this address instead, when the backend reaches the key endpoint differently than PowerSync does (for example a Docker network name). |
+| `AUTH_ALLOW_LOCAL_HTTP`, `AUTH_ALLOW_INSECURE_HTTP_HOSTS` | all | Plain-HTTP key endpoints. HTTPS is required by default; `AUTH_ALLOW_LOCAL_HTTP=true` permits loopback, and other hosts must be named exactly (no wildcards). |
+| `AUTH_ALGORITHMS` | all | A narrower asymmetric allowlist than the RS/PS/ES/EdDSA default. |
+| `POWERSYNC_CONFIG_DIR` | file | Docker Compose only: host directory holding `powersync-config.json` (default `backend/config`). |
+| `POWERSYNC_CONFIG_PATH` | file | Running on the host: path to the file, instead of `backend/config/powersync-config.json`. |
 
 ## Verification behavior
 

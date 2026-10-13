@@ -48,10 +48,10 @@ export function supplementsFromEnv(env: NodeJS.ProcessEnv = process.env): AuthSu
   return Object.fromEntries(Object.entries(candidates).filter(([, value]) => value !== undefined)) as AuthSupplements;
 }
 
-/** `cloud` (default) reads a PowerSync Cloud export; `self-hosted` uses AUTH_* variables alone. */
-export function authModeFromEnv(env: NodeJS.ProcessEnv = process.env): 'cloud' | 'self-hosted' {
+/** `file` (default) reads a PowerSync config file; `env` uses AUTH_* variables alone. */
+export function authModeFromEnv(env: NodeJS.ProcessEnv = process.env): 'file' | 'env' {
   const mode = env.AUTH_MODE?.trim();
-  if (!mode || mode === 'cloud') return 'cloud';
-  if (mode === 'self-hosted') return 'self-hosted';
-  throw new AuthConfigurationError(`Set AUTH_MODE to "cloud" or "self-hosted" (got "${mode}").`);
+  if (!mode || mode === 'file') return 'file';
+  if (mode === 'env') return 'env';
+  throw new AuthConfigurationError(`Set AUTH_MODE to "file" or "env" (got "${mode}").`);
 }

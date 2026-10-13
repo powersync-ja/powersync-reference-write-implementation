@@ -22,7 +22,7 @@ services:
       POWERSYNC_CONFIG_PATH: /app/config/powersync-config.json
     volumes:
       # The directory, not the file, so a missing export is the backend's error to report and
-      # AUTH_MODE=self-hosted can start without one.
+      # AUTH_MODE=env can start without one.
       - type: bind
         source: ${POWERSYNC_CONFIG_DIR:-./backend/config}
         target: /app/config

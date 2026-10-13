@@ -9,14 +9,13 @@ import type { TokenVerifier } from './types.js';
 // What the PowerSync export cannot tell the verifier comes from AUTH_* environment variables
 // (parsed in ./verifier/env.ts), not from edits to this file. See docs/auth/setup.md for what each one is for.
 
-// AUTH_MODE=self-hosted configures the verifier from AUTH_* variables alone: no export file is
-// read, so a self-hosted PowerSync deployment needs no code edits.
+// AUTH_MODE=env configures the verifier from AUTH_* variables alone: no config file is read.
 function resolveFromEnv(): ResolutionResult {
   const supplements = supplementsFromEnv();
   const { jwksUri, ...rest } = supplements;
   if (!jwksUri && !supplements.jwksUriOverride) {
     throw new AuthConfigurationError(
-      'AUTH_MODE=self-hosted requires AUTH_JWKS_URI (your provider\'s key endpoint), ' +
+      'AUTH_MODE=env requires AUTH_JWKS_URI (your provider\'s key endpoint), ' +
         'AUTH_ISSUER and AUTH_AUDIENCE. See docs/auth/setup.md.'
     );
   }
@@ -25,7 +24,7 @@ function resolveFromEnv(): ResolutionResult {
 }
 
 async function loadVerifier(): Promise<TokenVerifier> {
-  const result = authModeFromEnv() === 'self-hosted' ? resolveFromEnv() : await resolveFromExport();
+  const result = authModeFromEnv() === 'env' ? resolveFromEnv() : await resolveFromFile();
   if (result.status !== 'ready') {
     // Diagnostics name the offending field; they never echo configuration values.
     throw new AuthConfigurationError(
@@ -38,7 +37,7 @@ async function loadVerifier(): Promise<TokenVerifier> {
   return createTokenVerifier(result.config);
 }
 
-async function resolveFromExport(): Promise<ResolutionResult> {
+async function resolveFromFile(): Promise<ResolutionResult> {
   // The default is relative to this module; an override is absolute or relative to process cwd.
   const dumpPath = process.env.POWERSYNC_CONFIG_PATH ?? new URL('../../config/powersync-config.json', import.meta.url);
   let contents: string;
@@ -46,8 +45,8 @@ async function resolveFromExport(): Promise<ResolutionResult> {
     contents = await readFile(dumpPath, 'utf8');
   } catch {
     throw new AuthConfigurationError(
-      'Cannot read the PowerSync auth configuration. Export it to backend/config/powersync-config.json ' +
-        'or set POWERSYNC_CONFIG_PATH in .env to a readable JSON file. ' +
+      'Cannot read the PowerSync auth configuration. Export it to backend/config/powersync-config.json, ' +
+        'set POWERSYNC_CONFIG_PATH in .env to a readable JSON file, or set AUTH_MODE=env. ' +
         'For Docker, mount the file read-only. See docs/auth/setup.md.'
     );
   }
@@ -62,7 +61,16 @@ async function resolveFromExport(): Promise<ResolutionResult> {
     );
   }
 
-  return resolvePowerSyncAuth(dump, supplementsFromEnv());
+  // The shape tells the two apart: a Cloud export wraps the service config in `config`, a
+  // self-hosted service config has `client_auth` at the top level.
+  const top = typeof dump === 'object' && dump !== null ? dump as Record<string, unknown> : {};
+  if ('config' in top) return resolvePowerSyncAuth(dump, supplementsFromEnv());
+  if ('client_auth' in top) return resolveSelfHostedAuth(dump, supplementsFromEnv());
+  throw new AuthConfigurationError(
+    'Unrecognized PowerSync auth configuration. Expected a Cloud export (a top-level "config" object) ' +
+      'or a self-hosted service configuration (a top-level "client_auth" object). ' +
+      'Check POWERSYNC_CONFIG_PATH in .env. See docs/auth/setup.md.'
+  );
 }
 
 // Startup awaits this before listening. Cache the promise so concurrent callers share one JWKS
