@@ -12,10 +12,11 @@ From the repository root, export directly to the path the backend expects:
 
 ```sh
 powersync login
-powersync fetch config --instance-id="<instance-id>" --output=json > backend/powersync-config.json
+powersync fetch config --instance-id="<instance-id>" --output=json > backend/config/powersync-config.json
 ```
 
-To use a different file, set `POWERSYNC_CONFIG_PATH` to its absolute host path in the root `.env`.
+To use a different directory with Docker Compose, set `POWERSYNC_CONFIG_DIR` in the root `.env`;
+the file inside must be named `powersync-config.json`.
 
 Alternatively, run `powersync link cloud --instance-id="<instance-id>"` once, then omit the
 instance flag on later exports. If your installed CLI also requires organization or project
@@ -59,12 +60,14 @@ message naming the variable.
 
 ## Auth file location and startup
 
-The default auth file is `backend/powersync-config.json`. Which environment file the backend
+The default auth file is `backend/config/powersync-config.json`. Which environment file the backend
 reads depends on how you run it; see the [README](../../README.md#1-configure-the-database).
 
-With Docker Compose, `POWERSYNC_CONFIG_PATH` in the root `.env` selects an absolute host path.
-Compose mounts that file at `/run/secrets/powersync-config.json` and sets the container's variable
-to the mounted path. A missing source file prevents the container from starting.
+With Docker Compose, `POWERSYNC_CONFIG_DIR` in the root `.env` selects the host directory holding
+`powersync-config.json` (default `backend/config/`). Compose mounts that directory read-only at
+`/app/config` and sets the container's `POWERSYNC_CONFIG_PATH` to the file inside it. A
+missing file stops the backend with a setup message, except in `AUTH_MODE=self-hosted`, which
+ignores it.
 
 For local execution, the default path is relative to the verifier module. A custom
 `POWERSYNC_CONFIG_PATH` is resolved from the process working directory, normally `backend/`.
@@ -101,9 +104,6 @@ AUTH_JWKS_URI=https://issuer.example.com/.well-known/jwks.json
 
 The other `AUTH_*` variables for HTTP trust and algorithms apply as well. `AUTH_INSTANCE_URL`,
 `AUTH_SUPABASE_URL` and `AUTH_PROVIDER=supabase` are Cloud-only and are rejected in this mode.
-
-Docker Compose still bind-mounts `POWERSYNC_CONFIG_PATH` and refuses to start if the file is
-missing, even though this mode ignores it. Create a placeholder: `echo '{}' > backend/powersync-config.json`.
 
 Inline public keys (`client_auth.jwks`) cannot be given through variables. If your provider
 publishes no key endpoint, adapt `backend/src/auth/verifier.ts` to call `resolveSelfHostedAuth`

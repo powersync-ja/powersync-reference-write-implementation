@@ -21,11 +21,11 @@ Prerequisites: Docker Desktop, Node.js 24, pnpm 9, curl, and Python 3.
 
 1. INITIAL STARTUP
 
-[ ] From a fresh configuration with no backend/powersync-config.json, run:
+[ ] From a fresh configuration with no backend/config/powersync-config.json, run:
 
         docker compose up --build
 
-    Expected: Compose rejects the missing bind source. It cannot start the backend
+    Expected: the backend exits with "Cannot read the PowerSync auth configuration"
     until the auth file exists. If you already have an auth export, preserve it and
     skip this check. Do not overwrite an existing deployment configuration.
 
@@ -63,10 +63,10 @@ Prerequisites: Docker Desktop, Node.js 24, pnpm 9, curl, and Python 3.
         BATCH_ON_FATAL_ERROR=stop
 
     Use Docker Desktop's host.docker.internal here. Other Docker environments need
-    an equivalent host address. Leave POWERSYNC_CONFIG_PATH unset to use the default.
+    an equivalent host address. Leave POWERSYNC_CONFIG_DIR unset to use the default.
 
 [ ] Configure authentication as described in docs/auth/setup.md: export your
-    PowerSync configuration to backend/powersync-config.json and set any AUTH_* supplements
+    PowerSync configuration to backend/config/powersync-config.json and set any AUTH_* supplements
     in the root .env.
 
     Remote keys are fetched after the API starts, so startup does not need a token.
@@ -238,7 +238,7 @@ force-recreate for environment changes. Keep the required auth file mounted.
     Expected: instructions to choose stop or skip.
 
 [ ] Supply malformed auth JSON in a separate powersync-config-test.json file and
-    point POWERSYNC_CONFIG_PATH at its absolute host path; recreate the container.
+    point POWERSYNC_CONFIG_DIR at a directory containing it, named powersync-config.json; recreate the container.
     Expected: Cannot start. with an invalid-JSON message. Restore the original path.
 
 [ ] Confirm the backend does not issue tokens:

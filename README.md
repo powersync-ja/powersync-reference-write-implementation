@@ -51,7 +51,7 @@ It may need additional trusted settings, such as the expected issuer or audience
 
 Choose an integration:
 
-- **PowerSync Cloud:** export your config to `backend/powersync-config.json` and set any
+- **PowerSync Cloud:** export your config to `backend/config/powersync-config.json` and set any
   `AUTH_*` supplements; see [auth setup](docs/auth/setup.md). Supabase with asymmetric
   signing keys is supported by this path.
 - **Self-hosted PowerSync or another provider:** set `AUTH_MODE=self-hosted` with your issuer,

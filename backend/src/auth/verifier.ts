@@ -40,13 +40,13 @@ async function loadVerifier(): Promise<TokenVerifier> {
 
 async function resolveFromExport(): Promise<ResolutionResult> {
   // The default is relative to this module; an override is absolute or relative to process cwd.
-  const dumpPath = process.env.POWERSYNC_CONFIG_PATH ?? new URL('../../powersync-config.json', import.meta.url);
+  const dumpPath = process.env.POWERSYNC_CONFIG_PATH ?? new URL('../../config/powersync-config.json', import.meta.url);
   let contents: string;
   try {
     contents = await readFile(dumpPath, 'utf8');
   } catch {
     throw new AuthConfigurationError(
-      'Cannot read the PowerSync auth configuration. Export it to backend/powersync-config.json ' +
+      'Cannot read the PowerSync auth configuration. Export it to backend/config/powersync-config.json ' +
         'or set POWERSYNC_CONFIG_PATH in .env to a readable JSON file. ' +
         'For Docker, mount the file read-only. See docs/auth/setup.md.'
     );
