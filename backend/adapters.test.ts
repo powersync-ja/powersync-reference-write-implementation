@@ -23,11 +23,11 @@ vi.mock('pg', () => ({
       async connect() {
         await db.connect();
         return {
-          query: async (sql: string) => {
+          query: async (sql: string, params?: unknown[]) => {
             if (sql === 'COMMIT') return db.commit();
             if (sql === 'ROLLBACK') return db.rollback();
             if (sql === 'BEGIN') return db.begin();
-            if (sql.startsWith('SELECT set_config')) return db.setConfig(sql);
+            if (sql.startsWith('SELECT set_config')) return db.setConfig(sql, params);
             return db.operation();
           },
           release: db.release
@@ -165,6 +165,17 @@ describe('Postgres connection recovery', () => {
     expect(initializeTransaction).toHaveBeenCalledWith(expect.objectContaining({ query: expect.any(Function) }), auth);
     expect(db.setConfig).not.toHaveBeenCalled();
     expect(db.begin.mock.invocationCallOrder[1]).toBeLessThan(initializeTransaction.mock.invocationCallOrder[0]);
+  });
+  it('applies statement_timeout inside each transaction, because transaction poolers drop startup parameters', async () => {
+    const initializeTransaction = vi.fn().mockResolvedValue(undefined);
+    const persister = createPostgresPersister('postgres://user:pass@localhost:5432/db', defaultMapper, {
+      pool: { statement_timeout: 10_000 },
+      initializeTransaction
+    });
+    await persister.updateBatch(batch, auth);
+    expect(db.setConfig).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("'statement_timeout'"), ['10000']);
+    expect(db.begin.mock.invocationCallOrder[0]).toBeLessThan(db.setConfig.mock.invocationCallOrder[0]);
+    expect(db.setConfig.mock.invocationCallOrder[0]).toBeLessThan(initializeTransaction.mock.invocationCallOrder[0]);
   });
   it('rolls back when transaction initialization fails', async () => {
     const persister = createPostgresPersister('postgres://user:pass@localhost:5432/db', defaultMapper, {

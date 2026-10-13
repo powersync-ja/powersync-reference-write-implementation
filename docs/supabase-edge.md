@@ -69,19 +69,24 @@ Keep `verify_jwt = true` (set in `supabase/config.toml`). Connect through the tr
 pooler by setting its connection string as a secret:
 
 ```bash
-supabase secrets set POWERSYNC_DATABASE_URL='postgresql://...pooler.supabase.com:6543/postgres'
+supabase secrets set POWERSYNC_DATABASE_URL='postgresql://...pooler.supabase.com:6543/postgres?sslmode=verify-full'
 ```
+
+The transaction pooler ignores settings sent when a connection opens, so the persister applies
+the configured `statement_timeout` inside each transaction instead.
 
 Without it, the function uses the injected `SUPABASE_DB_URL`. The issuer is derived from
 `SUPABASE_URL`; set `POWERSYNC_JWT_ISSUER` only if your tokens use a different issuer.
 
-Hosted deployment has not been verified yet. [The hosted test specification](../.planning/supabase-edge/hosted-test-spec.md)
-lists the checks still outstanding, including gateway behavior, key rotation, pooler/TLS, and
-bundle size.
+A first hosted run (2026-10-13, ES256, eu-west-2, transaction pooler with `verify-full`) passed
+the gateway, credential, RLS, pooled-identity, batch, TLS and timeout checks. Still unverified on
+hosted: RS256, key rotation, controlled-claims tokens, the editable hooks, the skip policy and
+JWKS outages. See [the hosted test specification](../.planning/supabase-edge/hosted-test-spec.md).
 
 ## Tests
 
-With the local stack and `supabase functions serve` running:
+With the local stack and `supabase functions serve` running (`supabase/config.toml` enables the
+local transaction pooler, which one test uses):
 
 ```bash
 cd supabase/functions/powersync-write

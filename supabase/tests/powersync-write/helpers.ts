@@ -9,6 +9,9 @@ export const FUNCTION_URL =
 export const DATA_URL = `${FUNCTION_URL}/api/data`;
 export const LOCAL_ISSUER = 'http://127.0.0.1:54321/auth/v1';
 
+/** Local Supavisor in transaction mode ([db.pooler] in supabase/config.toml), like the hosted transaction pooler. */
+export const POOLER_URL = 'postgresql://postgres.pooler-dev:postgres@127.0.0.1:54329/postgres';
+
 /** Administrative connection for checking persisted state. Never used for writes under test. */
 export const admin = new pg.Pool({ connectionString: 'postgresql://postgres:postgres@127.0.0.1:54322/postgres', max: 2 });
 

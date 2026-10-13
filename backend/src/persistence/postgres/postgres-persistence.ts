@@ -17,6 +17,9 @@ export interface PostgresPersisterOptions {
    * Extra pg pool settings, such as max, connectionTimeoutMillis (acquisition wait), and
    * statement_timeout. Unset fields keep pg defaults. The connection string still supplies
    * the host, credentials, database, and TLS options.
+   *
+   * statement_timeout is also applied transaction-locally after BEGIN. pg sends it as a
+   * connection startup parameter, which transaction poolers such as Supavisor drop.
    */
   pool?: Omit<PG.PoolConfig, 'connectionString'>;
   /**
@@ -41,6 +44,7 @@ export const createPostgresPersister = (
 
   const initializeTransaction = options.initializeTransaction ?? setAppUserId;
   const pool = new Pool({ ...options.pool, connectionString: uri });
+  const statementTimeout = options.pool?.statement_timeout;
 
   pool.on('error', (err, client) => {
     console.error('Pool connection failure to postgres:', err, client);
@@ -60,6 +64,9 @@ export const createPostgresPersister = (
       let discard: Error | undefined;
       try {
         await client.query('BEGIN');
+        if (statementTimeout !== undefined) {
+          await client.query(`SELECT set_config('statement_timeout', $1, true)`, [String(statementTimeout)]);
+        }
 
         // By default this exposes the verified subject to application RLS policies; see
         // docs/authorization.md.

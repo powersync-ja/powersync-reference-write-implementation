@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertMatch } from '@std/assert';
 import { createPostgresPersister } from '../../../backend/src/persistence/postgres/postgres-persistence.ts';
 import { asAuthenticatedUser } from '../../functions/powersync-write/rls.ts';
-import { admin, batch, del, FUNCTION_URL, listRow, patch, post, postBody, put, signUp, todoRow, type TestUser } from './helpers.ts';
+import { admin, batch, del, FUNCTION_URL, listRow, POOLER_URL, patch, post, postBody, put, signUp, todoRow, type TestUser } from './helpers.ts';
 
 const id = () => crypto.randomUUID();
 let a: TestUser;
@@ -129,6 +129,24 @@ Deno.test({
         await persister.end();
       }
       assertEquals(seen, Array(3).fill({ role: 'postgres', claims: '' }));
+    });
+
+    await t.step('applies statement_timeout inside transactions behind a transaction pooler', async () => {
+      // Transaction poolers drop pg's startup parameters, so the persister must set it per transaction.
+      const seen: string[] = [];
+      const persister = createPostgresPersister(POOLER_URL, undefined, {
+        pool: { max: 1, statement_timeout: 1234 },
+        initializeTransaction: async (client, auth) => {
+          seen.push((await client.query(`select current_setting('statement_timeout') as t`)).rows[0].t);
+          await asAuthenticatedUser(client, auth);
+        }
+      });
+      try {
+        await persister.updateBatch([put('lists', id(), { name: 'pooled' }) as never], { sub: a.id, claims: { sub: a.id, role: 'authenticated' } });
+      } finally {
+        await persister.end();
+      }
+      assertEquals(seen, ['1234ms']);
     });
 
     await admin.end();
