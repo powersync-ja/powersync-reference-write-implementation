@@ -43,9 +43,8 @@ Preserve the modular connector's runtime behavior and follow these requirements:
 Write comments that explain behavior, configuration, or constraints. Avoid repeated
 reassurances, all-caps warnings, metaphors, and accounts of earlier design proposals.
 
-Update the example-client README if the file layout changes, and keep the single-import
-check in `docs/manual-test-plan.md` consistent. The example client remains reference code without
-its own package manifest, build step, or test suite.
+Update the example-client README if the file layout changes. The example client remains
+reference code without its own package manifest, build step, or test suite.
 
 ## Fatal-error handling
 

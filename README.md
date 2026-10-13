@@ -51,14 +51,12 @@ It may need additional trusted settings, such as the expected issuer or audience
 
 Choose an integration:
 
-- **PowerSync Cloud:** export your config to `backend/powersync-config.json` and set any
-  `AUTH_*` supplements; see [auth setup](docs/auth/setup.md). Supabase with asymmetric
-  signing keys is supported by this path.
-- **Self-hosted PowerSync:** adapt the loader to use `resolveSelfHostedAuth`, as described in
-  [auth setup](docs/auth/setup.md#self-hosted-powersync). The default loader does not read
-  YAML or detect self-hosted configuration automatically.
-- **Custom provider:** preserve the startup and request exports when replacing the verifier.
-  See [Supabase and Clerk integration](docs/auth/verifiers.md).
+- **PowerSync Cloud or self-hosted PowerSync:** save your config as
+  `backend/config/powersync-config.json` (the default) and set any `AUTH_*` supplements; see
+  [auth setup](docs/auth/setup.md#config-file-default).
+- **Any other provider (Clerk, Auth0, Supabase):** set `AUTH_MODE=env` with your issuer,
+  audience and JWKS URL, no file needed. See [auth setup](docs/auth/setup.md#environment-variables-only)
+  and the [Supabase and Clerk guide](docs/auth/providers.md).
 
 ### 3. Start the API
 
@@ -140,5 +138,3 @@ Tests use local fixtures and mocks; they need permission to open local listening
 but no Docker, running database, or live identity provider. Type generation updates both
 `backend/src/generated/api.ts` and `example-client/src/generated/api.d.ts` from the OpenAPI
 spec. Run it after editing the spec.
-
-[The manual checklist](docs/manual-test-plan.md) provides a separate Postgres test setup.

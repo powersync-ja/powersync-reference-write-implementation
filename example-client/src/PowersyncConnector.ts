@@ -25,7 +25,7 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
   }
 
   // Returns credentials for the PowerSync sync connection, reusing the write API token.
-  // The write API accepts tokens your PowerSync instance trusts. See docs/auth/verifiers.md.
+  // The write API accepts tokens your PowerSync instance trusts. See docs/auth/providers.md.
   async fetchCredentials() {
     return {
       endpoint: this.config.powersyncUrl,

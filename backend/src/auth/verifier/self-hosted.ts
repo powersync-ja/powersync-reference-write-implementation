@@ -67,7 +67,12 @@ export function resolveSelfHostedAuth(config: unknown, supplements: AuthSuppleme
       diagnostics.issue('invalid', 'audience', 'Explicit audiences conflict with the complete audience list in client_auth.audience.');
     } else audience = explicitAudience;
   }
-  if (!audience.length) diagnostics.issue('missing', 'audience', 'Supply client_auth.audience, or an explicit intended audience list; a token audience is always required.');
+  const requireAudience = supplements.requireAudience !== false;
+  const authorizedParties = supplements.authorizedParties?.length ? [...new Set(supplements.authorizedParties)] : undefined;
+  if (!requireAudience) {
+    if (!authorizedParties) diagnostics.issue('missing', 'authorizedParties', 'Tokens without an audience are accepted only when the accepted client origins (azp) are listed; without either check any token from the issuer would be valid.');
+    if (audience.length) diagnostics.issue('invalid', 'audience', 'An audience list conflicts with requireAudience=false.');
+  } else if (!audience.length) diagnostics.issue('missing', 'audience', 'Supply client_auth.audience, or an explicit intended audience list; a token audience is always required.');
 
   if (auth.jwks_uri !== undefined && !uriList(auth.jwks_uri)) diagnostics.issue('invalid', 'client_auth.jwks_uri', 'Expected one JWKS URI string, or a non-empty array of them.');
   const override = overrideUris(supplements, diagnostics);
@@ -90,5 +95,8 @@ export function resolveSelfHostedAuth(config: unknown, supplements: AuthSuppleme
 
   const algorithms = algorithmPolicy(supplements, diagnostics);
   if (diagnostics.failed) return diagnostics.failure();
-  return resolved({ provider: 'generic', issuer: issuer!, audience, algorithms: [...algorithms], sources }, trust, diagnostics);
+  return resolved({
+    provider: 'generic', issuer: issuer!, audience, ...(requireAudience ? {} : { requireAudience }),
+    ...(authorizedParties ? { authorizedParties } : {}), algorithms: [...algorithms], sources
+  }, trust, diagnostics);
 }
