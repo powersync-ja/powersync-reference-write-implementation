@@ -1,34 +1,53 @@
 import { readFile } from 'node:fs/promises';
-import { AuthConfigurationError, createTokenVerifier, resolvePowerSyncAuth } from './verifier/index.ts';
-import { supplementsFromEnv } from './verifier/env.ts';
+import {
+  AuthConfigurationError, createTokenVerifier, resolvePowerSyncAuth, resolveSelfHostedAuth
+} from './verifier/index.ts';
+import { authModeFromEnv, supplementsFromEnv } from './verifier/env.ts';
+import type { ResolutionResult } from './verifier/types.ts';
 import type { TokenVerifier } from './types.ts';
 
-// What the PowerSync export cannot tell the verifier comes from AUTH_* environment variables (see
-// supplementsFromEnv in ./verifier/env.ts), not from edits to this file: set them in the root `.env`
-// or `.env.local`. Start with none and let the diagnostics tell you what is missing. The common ones:
+// What the PowerSync export cannot tell the verifier comes from AUTH_* environment variables
+// (parsed in ./verifier/env.ts), not from edits to this file. See docs/auth/setup.md for what each one is for.
 
-// | Variable | Supplement | When you need it |
-// | --- | --- | --- |
-// | `AUTH_ISSUER` | `issuer` | Any generic (non-Supabase) provider. PowerSync never validates `iss`, so the expected issuer comes from your own trusted settings, not the dump. |
-// | `AUTH_INSTANCE_URL` | `instanceUrl` | Generic Cloud imports: the instance URL is the default audience, and the export does not contain it. |
-// | `AUTH_AUDIENCE` | `audience` | Instead of `AUTH_INSTANCE_URL`, when you want to state the accepted audience list explicitly (comma-separated). Must include the exported `additional_audiences`. |
-// | `AUTH_SUPABASE_URL` / `AUTH_PROVIDER=supabase` | `supabaseUrl` / `provider` | Supabase behind a custom domain, or when database-based detection is ambiguous. |
-// | `AUTH_JWKS_URI` | `jwksUri` | The export has no key endpoint and you know it. It cannot override a different exported URI. |
-// | `AUTH_JWKS_URI_OVERRIDE` | `jwksUriOverride` | The exported endpoint is written from the PowerSync service's network view (e.g. `http://backend:6060/...`) and your backend reaches those keys at a different address. |
-// | `AUTH_ALLOW_LOCAL_HTTP` / `AUTH_ALLOW_INSECURE_HTTP_HOSTS` | `allowLocalHttp` / `allowInsecureHttpHosts` | Plain HTTP key endpoints. Loopback, or exactly named hosts — no wildcards. |
-// | `AUTH_ALGORITHMS` | `algorithms` | Narrower asymmetric allowlist than the RS/PS/ES/EdDSA default. |
+// AUTH_MODE=env configures the verifier from AUTH_* variables alone: no config file is read.
+function resolveFromEnv(): ResolutionResult {
+  const supplements = supplementsFromEnv();
+  const { jwksUri, ...rest } = supplements;
+  if (!jwksUri && !supplements.jwksUriOverride) {
+    throw new AuthConfigurationError(
+      'AUTH_MODE=env requires AUTH_JWKS_URI (your provider\'s key endpoint), ' +
+        'AUTH_ISSUER and AUTH_AUDIENCE. See docs/auth/setup.md.'
+    );
+  }
+  // The self-hosted resolver takes the key endpoint from the service config, so state it there.
+  return resolveSelfHostedAuth({ client_auth: jwksUri ? { jwks_uri: jwksUri } : {} }, rest);
+}
 
 async function loadVerifier(): Promise<TokenVerifier> {
+  const result = authModeFromEnv() === 'env' ? resolveFromEnv() : await resolveFromFile();
+  if (result.status !== 'ready') {
+    // Diagnostics name the offending field; they never echo configuration values.
+    throw new AuthConfigurationError(
+      'Invalid PowerSync auth configuration. Check POWERSYNC_CONFIG_PATH and the AUTH_* settings ' +
+        'in the environment (.env / .env.local). See docs/auth/setup.md.\n\n' +
+        result.diagnostics.map((d) => `${d.field}: ${d.message}`).join('\n')
+    );
+  }
+  for (const diagnostic of result.diagnostics) console.warn(diagnostic.message);
+  return createTokenVerifier(result.config);
+}
+
+async function resolveFromFile(): Promise<ResolutionResult> {
   // The default is relative to this module; an override is absolute or relative to process cwd.
-  const dumpPath = process.env.POWERSYNC_CONFIG_PATH ?? new URL('../../powersync-config.json', import.meta.url);
+  const dumpPath = process.env.POWERSYNC_CONFIG_PATH ?? new URL('../../config/powersync-config.json', import.meta.url);
   let contents: string;
   try {
     contents = await readFile(dumpPath, 'utf8');
   } catch {
     throw new AuthConfigurationError(
-      'Cannot read the PowerSync auth configuration. Export it to backend/powersync-config.json ' +
-        'or set POWERSYNC_CONFIG_PATH in .env to a readable JSON file. ' +
-        'For Docker, mount the file read-only. See backend/src/auth/SETUP.md.'
+      'Cannot read the PowerSync auth configuration. Export it to backend/config/powersync-config.json, ' +
+        'set POWERSYNC_CONFIG_PATH in .env to a readable JSON file, or set AUTH_MODE=env. ' +
+        'For Docker, mount the file read-only. See docs/auth/setup.md.'
     );
   }
 
@@ -38,21 +57,20 @@ async function loadVerifier(): Promise<TokenVerifier> {
   } catch {
     throw new AuthConfigurationError(
       'Invalid JSON in the PowerSync auth configuration. Re-export the complete CLI JSON response ' +
-        'and check POWERSYNC_CONFIG_PATH in .env. See backend/src/auth/SETUP.md.'
+        'and check POWERSYNC_CONFIG_PATH in .env. See docs/auth/setup.md.'
     );
   }
 
-  const result = resolvePowerSyncAuth(dump, supplementsFromEnv());
-  if (result.status !== 'ready') {
-    // Diagnostics name the offending field; they never echo configuration values.
-    throw new AuthConfigurationError(
-      'Invalid PowerSync auth configuration. Check POWERSYNC_CONFIG_PATH and the AUTH_* settings ' +
-        'in the environment (.env / .env.local). See backend/src/auth/SETUP.md.\n\n' +
-        result.diagnostics.map((d) => `${d.field}: ${d.message}`).join('\n')
-    );
-  }
-  for (const diagnostic of result.diagnostics) console.warn(diagnostic.message);
-  return createTokenVerifier(result.config);
+  // The shape tells the two apart: a Cloud export wraps the service config in `config`, a
+  // self-hosted service config has `client_auth` at the top level.
+  const top = typeof dump === 'object' && dump !== null ? dump as Record<string, unknown> : {};
+  if ('config' in top) return resolvePowerSyncAuth(dump, supplementsFromEnv());
+  if ('client_auth' in top) return resolveSelfHostedAuth(dump, supplementsFromEnv());
+  throw new AuthConfigurationError(
+    'Unrecognized PowerSync auth configuration. Expected a Cloud export (a top-level "config" object) ' +
+      'or a self-hosted service configuration (a top-level "client_auth" object). ' +
+      'Check POWERSYNC_CONFIG_PATH in .env. See docs/auth/setup.md.'
+  );
 }
 
 // Startup awaits this before listening. Cache the promise so concurrent callers share one JWKS

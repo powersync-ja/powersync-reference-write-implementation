@@ -17,15 +17,17 @@ export interface Authorizer {
 `crud` contains the operations sent by the client. `auth` contains the verified token
 subject and claims: `{ sub, claims }`.
 
-Returning `false` rejects the whole transaction with `UNAUTHORIZED`. The
-[fatal-error handler](error-handling.md) determines whether the client retains it.
-Client-directed failures remain queued until the application decides how to handle them.
+Returning `false` rejects the whole transaction with `UNAUTHORIZED`. The default
+[fatal-error handler](../error-handling.md) treats this as client-directed: the transaction stays
+queued on the client and is retried, so a denied write is not lost. It blocks later uploads
+until the permission is granted or the app's `onFatalTransaction` hook releases it. To drop
+denied writes instead, change `requiresClientHandling` in `backend/src/fatal-error-handler.ts`.
 
 Replace `authorizer` with your application's checks, such as table permissions or
 required roles. The default implementation logs this message on every call:
 
 ```
-Authorization is not configured. All authenticated writes are allowed. Configure backend/src/auth/authorizer.ts; see docs/authorization.md.
+Authorization is not configured. All authenticated writes are allowed. Configure backend/src/auth/authorizer.ts; see docs/auth/authorization.md.
 ```
 
 ## Checking existing rows

@@ -111,14 +111,15 @@ describe('fatal routing over HTTP', () => {
   });
 
   it.each(['stop', 'skip'] as const)(
-    'routes authorization rejection and preserves transient classification under %s',
+    'keeps authorization rejection queued for the client and preserves transient classification under %s',
     async (mode) => {
       const handler = vi.spyOn(fatalErrorHandler, 'onDeadLetter').mockImplementation(() => {});
       mocks.authorize.mockResolvedValueOnce(false);
       const denied = await post();
       expect(denied.body.results[0].failed_operation.error_code).toBe('UNAUTHORIZED');
+      expect(denied.body.results[0].requires_client_handling).toBe(true);
       expect(mocks.updateBatch).not.toHaveBeenCalled();
-      expect(handler).toHaveBeenCalledOnce();
+      expect(handler).not.toHaveBeenCalled();
       mocks.updateBatch.mockRejectedValueOnce(new RetryableError('timeout'));
       const retry = await post(mode);
       expect(retry.body.results.map((r: { status: string }) => r.status)).toEqual([
@@ -126,7 +127,7 @@ describe('fatal routing over HTTP', () => {
         'not_attempted',
         'not_attempted'
       ]);
-      expect(handler).toHaveBeenCalledOnce();
+      expect(handler).not.toHaveBeenCalled();
     }
   );
 });

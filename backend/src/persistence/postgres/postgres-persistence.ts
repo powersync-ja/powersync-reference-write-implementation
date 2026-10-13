@@ -69,7 +69,7 @@ export const createPostgresPersister = (
         }
 
         // By default this exposes the verified subject to application RLS policies; see
-        // docs/authorization.md.
+        // docs/auth/authorization.md.
         await initializeTransaction(client, auth);
 
         for (const [operationIndex, op] of batch.entries()) {

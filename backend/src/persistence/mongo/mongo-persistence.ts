@@ -3,7 +3,7 @@ import type { Persister, CrudEntry } from '../../types.ts';
 import { classifyMongoError } from './mongo-errors.ts';
 import type { EntryMapper } from '../../mapping/types.ts';
 import { createMongoMapper } from '../../mapping/mongo.ts';
-import { discoverSchema, type TableSchema } from './mongo-schema.ts';
+import { discoverSchema, type CollectionSchema } from './mongo-schema.ts';
 import { FatalOperationError, RetryableError } from '../../errors.ts';
 import type { AuthContext } from '../../auth/types.ts';
 
@@ -15,7 +15,7 @@ export const createMongoPersister = async (uri: string, mapper?: EntryMapper): P
   await client.connect();
 
   // Custom mappers handle their own schema mapping; only the default mapper needs discovery.
-  const schema: Record<string, TableSchema> | null = mapper ? null : await discoverSchema(db);
+  const schema: Record<string, CollectionSchema> | null = mapper ? null : await discoverSchema(db);
   const resolvedMapper = mapper ?? createMongoMapper(schema!);
 
   const persister: Persister = {

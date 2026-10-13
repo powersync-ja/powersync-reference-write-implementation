@@ -1,24 +1,30 @@
 # PowerSync Reference Write Implementation
 
-This backend accepts queued changes from a PowerSync client and writes them to your
-source database. PowerSync then syncs that database to clients.
+When your PowerSync-enabled front-end app writes data using SQL INSERT, UPDATE, or DELETE statements,
+PowerSync automatically queues these mutations for processing using the `uploadData` function.
 
-The repository includes an Express API, adapters for Postgres, MongoDB, MySQL, and
-SQL Server, and reference TypeScript connectors. You supply the database, PowerSync
-instance, client application, and application-specific authorization.
+While there are no restrictions on the implementation of `uploadData` and the related backend API,
+this repository provides a reference implementation for both the client-side implementation and the backend
+API which will support most simple use-cases.  It provides extension points that will allow you to customize
+the behavior to your own requirements, or you can modify it to suit your specific case.
+
+- [backend/powersync-reference-write-api.openapi.yaml](backend/powersync-reference-write-api.openapi.yaml) provides a simple but flexible API definition that serves as a contract between frontend and backend.
+- A [reference implementation](example-client/src/PowersyncConnector.ts) of `uploadData` handles most common workflows. It will marshal queued changes to the format specified by the API definition. A [single-file version](example-client/src/PowersyncConnector.singlefile.ts) is provided for ease of copy-paste.
+- A [reference backend](backend) accepts API requests from the front-end and writes them to your source database. This includes an Express API, adapters for Postgres, MongoDB, MySQL, and SQL Server.
+
+You supply the database, PowerSync instance, client application, and application-specific authorization, and you must copy the example `uploadData` implementation to your front-end code.
 
 On Supabase, you can deploy the same write API as an Edge Function that enforces your RLS
 policies instead; see [Supabase Edge Function](supabase/README.md).
 
 ## Setup
 
-Run the commands below from the repository root. Docker Compose runs the backend;
-local development and tests use Node.js 24 and pnpm 9. The existing `backend/.nvmrc`
-pins an older Node version, so select Node 24 explicitly for local work.
+Run the commands below from the repository root. `docker compose` runs the backend;
+local development and tests use Node.js 24 and pnpm 9.
 
 ### 1. Configure the database
 
-Edit the root `.env` for Docker Compose:
+Set these in `.env.local` (or the root `.env` for shared defaults) for Docker Compose:
 
 | Variable | Meaning |
 | --- | --- |
@@ -27,14 +33,13 @@ Edit the root `.env` for Docker Compose:
 | `BATCH_ON_FATAL_ERROR` | `stop` (default) or `skip`; see [error handling](docs/error-handling.md) |
 
 `.env` is committed, so keep it to shared defaults. Put this machine's values and any secret, such
-as a `DATABASE_URI` with a password, in a `.env.local` beside it: it is gitignored, optional, and
+as a `DATABASE_URI` with a password, in `.env.local`. This is gitignored, optional, and
 overrides `.env`. Compose passes both files to the container, so `docker compose up` needs no extra
-flags. Setting a variable in your shell no longer overrides them; use `.env.local` instead.
+flags.
 
 Use the database that your PowerSync instance already replicates. Tables and columns
-must match uploaded operations unless you add [schema mapping](docs/schema-mapping.md).
-MongoDB transactions require a replica set or sharded cluster; the default MongoDB
-mapper also requires collection `$jsonSchema` validators.
+must match uploaded operations unless you add custom [schema mapping](docs/schema-mapping.md).
+The default MongoDB mapper also requires collection `$jsonSchema` validators.
 
 In Docker Desktop, use `host.docker.internal` to reach a database on the host.
 For a backend running directly on the host, use the database's host-accessible address,
@@ -42,17 +47,19 @@ such as `localhost`. Other Docker environments may require a host-gateway config
 
 ### 2. Configure authentication
 
-Follow [the auth setup guide](backend/src/auth/SETUP.md). The default backend reads a
-PowerSync Cloud export from `backend/powersync-config.json`; generic providers also
-require an expected issuer and audience in `backend/src/auth/verifier.ts`.
+The backend accepts tokens signed by keys it trusts, normally the same provider your PowerSync instance trusts,
+so clients authenticate with the same provider for read and write.
+The default `backend/src/auth/verifier.ts` reads a PowerSync Cloud JSON export, resolves its authentication settings, and builds a verifier.
+It may need additional trusted settings, such as the expected issuer or audience.
 
-Compose mounts the export read-only. To use a different file, set `POWERSYNC_CONFIG_PATH`
-to its absolute host path in the root `.env`. The file must exist before starting Compose.
+Choose an integration:
 
-For Supabase or Clerk, see [provider integration](docs/auth-verifiers.md). Self-hosted
-PowerSync requires adapting the verifier loader as described in the setup guide.
-The backend does not issue tokens. It only accepts tokens signed by keys your auth config
-trusts, so clients authenticate with the same provider your PowerSync instance uses.
+- **PowerSync Cloud or self-hosted PowerSync:** save your config as
+  `backend/config/powersync-config.json` (the default) and set any `AUTH_*` supplements; see
+  [auth setup](docs/auth/setup.md#config-file-default).
+- **Any other provider (Clerk, Auth0, Supabase):** set `AUTH_MODE=env` with your issuer,
+  audience and JWKS URL, no file needed. See [auth setup](docs/auth/setup.md#environment-variables-only)
+  and the [Supabase and Clerk guide](docs/auth/providers.md).
 
 ### 3. Start the API
 
@@ -63,9 +70,7 @@ docker compose up --build
 The API listens at `http://localhost:6060`. Compose fixes both the container and host
 port to 6060; change its `ports` mapping to expose a different host port.
 
-Startup checks the database type, connection string, fatal-error policy, and verifier
-configuration. Remote JWKS keys are fetched when needed during token verification.
-A successful startup does not prove that every database operation or provider is reachable.
+Startup checks the database type, connection string, fatal-error policy, and verifier configuration.
 
 ### 4. Connect the client
 
@@ -73,7 +78,7 @@ Copy a connector from [example-client](example-client/README.md) into your app. 
 its write API URL, PowerSync sync URL, and token retrieval, then pass it to your existing
 PowerSync database's `connect()` method. The connector implements:
 
-- `fetchCredentials()`: credentials for the PowerSync sync connection.
+- `fetchCredentials()`: credentials for the PowerSync sync connection. If your application is already reading data from PowerSync then you will have already implemented this function, we recommend that you keep your existing implementation and configure the API to trust the same issuers - see [auth setup](docs/auth/setup.md).
 - `uploadData()`: sends queued local transactions to `POST /api/data`.
 
 Use a URL reachable from the client device. `localhost` refers to that device, so another
@@ -83,13 +88,13 @@ computer or phone needs the backend's network address or a tunnel URL.
 
 The default authorizer allows all authenticated writes. Add your application's checks in
 [`backend/src/auth/authorizer.ts`](backend/src/auth/authorizer.ts); see
-[authorization](docs/authorization.md). Configure your PowerSync sync streams or rules
+[authorization](docs/auth/authorization.md). Configure your PowerSync sync streams or rules
 separately to control which rows each user can read.
 
 [Schema mapping](docs/schema-mapping.md) describes field conversion and custom writes.
 [Error handling](docs/error-handling.md) explains rejected transactions, queue retention,
-and the optional dead-letter callback. By default, fatal failures are logged by the backend
-and removed from the client upload queue. The callback does not provide durable storage.
+and the optional dead-letter callback. By default, fatal failures other than `UNAUTHORIZED` are logged by the backend
+and removed from the client upload queue; authorization rejections stay queued. The callback does not provide durable storage.
 
 ## API
 
@@ -122,8 +127,7 @@ pnpm --dir backend dev
 ```
 
 The local port defaults to 6060 and can be changed with `PORT` in `backend/.env`.
-Restart after changing auth configuration. Rebuild the image after code changes when
-using Compose without the development overlay.
+Rebuild the image after code changes when using Compose without the development overlay.
 
 ## Tests and API types
 
@@ -137,5 +141,3 @@ Tests use local fixtures and mocks; they need permission to open local listening
 but no Docker, running database, or live identity provider. Type generation updates both
 `backend/src/generated/api.ts` and `example-client/src/generated/api.d.ts` from the OpenAPI
 spec. Run it after editing the spec.
-
-[The manual checklist](docs/test.txt) provides a separate Postgres test setup.

@@ -5,19 +5,6 @@ import type { AuthSupplements } from './types.ts';
  * Environment variable for each supplement. Set them in the root `.env` (shared defaults) or
  * `.env.local` (this machine) for Docker Compose, or in `backend/.env` when running on the host.
  * Unset or blank means "not supplied". List values are comma-separated.
- *
- * | Variable | Supplement |
- * | --- | --- |
- * | `AUTH_ISSUER` | `issuer` |
- * | `AUTH_AUDIENCE` | `audience` (list) |
- * | `AUTH_INSTANCE_URL` | `instanceUrl` |
- * | `AUTH_SUPABASE_URL` | `supabaseUrl` |
- * | `AUTH_PROVIDER` | `provider`: `supabase` or `generic` |
- * | `AUTH_JWKS_URI` | `jwksUri` |
- * | `AUTH_JWKS_URI_OVERRIDE` | `jwksUriOverride` (list) |
- * | `AUTH_ALGORITHMS` | `algorithms` (list) |
- * | `AUTH_ALLOW_LOCAL_HTTP` | `allowLocalHttp`: `true` or `false` |
- * | `AUTH_ALLOW_INSECURE_HTTP_HOSTS` | `allowInsecureHttpHosts` (list) |
  */
 export function supplementsFromEnv(env: NodeJS.ProcessEnv = process.env): AuthSupplements {
   const text = (name: string): string | undefined => {
@@ -52,9 +39,19 @@ export function supplementsFromEnv(env: NodeJS.ProcessEnv = process.env): AuthSu
     jwksUri: text('AUTH_JWKS_URI'),
     jwksUriOverride: list('AUTH_JWKS_URI_OVERRIDE'),
     algorithms: list('AUTH_ALGORITHMS'),
+    requireAudience: flag('AUTH_REQUIRE_AUDIENCE'),
+    authorizedParties: list('AUTH_AUTHORIZED_PARTIES'),
     allowLocalHttp: flag('AUTH_ALLOW_LOCAL_HTTP'),
     allowInsecureHttpHosts: list('AUTH_ALLOW_INSECURE_HTTP_HOSTS')
   };
   // The resolver treats a missing key and an undefined one differently in a few places; omit unset keys.
   return Object.fromEntries(Object.entries(candidates).filter(([, value]) => value !== undefined)) as AuthSupplements;
+}
+
+/** `file` (default) reads a PowerSync config file; `env` uses AUTH_* variables alone. */
+export function authModeFromEnv(env: NodeJS.ProcessEnv = process.env): 'file' | 'env' {
+  const mode = env.AUTH_MODE?.trim();
+  if (!mode || mode === 'file') return 'file';
+  if (mode === 'env') return 'env';
+  throw new AuthConfigurationError(`Set AUTH_MODE to "file" or "env" (got "${mode}").`);
 }

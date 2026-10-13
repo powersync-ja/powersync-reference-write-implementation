@@ -5,7 +5,7 @@ node_modules
 # Secrets and local state must never reach the image.
 .env
 .envrc
-powersync-config*.json
+**/powersync-config*.json
 powersync/
 
 # Build and run artefacts.

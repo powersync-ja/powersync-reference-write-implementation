@@ -69,7 +69,7 @@ describe('refusing to start on bad configuration', () => {
   it.each([
     ['missing.json', 'Cannot read'],
     ['malformed.json', 'Invalid JSON'],
-    ['invalid.json', 'config:'],
+    ['invalid.json', 'Unrecognized PowerSync auth configuration'],
     ['unsupported.json', 'config.client_auth.supabase_jwt_secret:']
   ])('reports auth configuration errors for %s before listening', async (file, diagnostic) => {
     const { code, output, stillRunning } = await bootWith({
@@ -82,7 +82,7 @@ describe('refusing to start on bad configuration', () => {
     expect(output).toContain('Cannot start.');
     expect(output).toContain(diagnostic);
     expect(output).toContain('POWERSYNC_CONFIG_PATH');
-    expect(output).toContain('SETUP.md');
+    expect(output).toContain('docs/auth/setup.md');
     expect(output).not.toContain('do-not-print-this');
     expect(output).not.toMatch(/^\s+at .+/m);
   });

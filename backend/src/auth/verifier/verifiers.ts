@@ -18,7 +18,10 @@ export interface VerifierOptions {
 function snapshot(input: ResolvedAuthConfig): ResolvedAuthConfig {
   try {
     if (!['generic', 'supabase'].includes(input.provider) || !nonempty(input.issuer) ||
-        !strings(input.audience) || !input.audience.length || !strings(input.algorithms) || !input.algorithms.length ||
+        !strings(input.audience) || (input.requireAudience !== false && !input.audience.length) ||
+        (input.requireAudience === false && !input.authorizedParties?.length) ||
+        (input.authorizedParties !== undefined && (!strings(input.authorizedParties) || !input.authorizedParties.length)) ||
+        !strings(input.algorithms) || !input.algorithms.length ||
         input.algorithms.some(alg => !(ASYMMETRIC_ALGORITHMS as readonly string[]).includes(alg)) ||
         typeof input.allowLocalHttp !== 'boolean' || !Array.isArray(input.sources) || !input.sources.length ||
         !Array.isArray(input.insecureHttpHosts) || (input.insecureHttpHosts.length && !strings(input.insecureHttpHosts))) throw new Error();
@@ -30,7 +33,7 @@ function snapshot(input: ResolvedAuthConfig): ResolvedAuthConfig {
       }
       throw new Error();
     });
-    return { ...input, sources, audience: [...input.audience], algorithms: [...input.algorithms], insecureHttpHosts: [...input.insecureHttpHosts] };
+    return { ...input, sources, audience: [...input.audience], authorizedParties: input.authorizedParties && [...input.authorizedParties], algorithms: [...input.algorithms], insecureHttpHosts: [...input.insecureHttpHosts] };
   } catch { throw new AuthConfigurationError(); }
 }
 
@@ -70,16 +73,20 @@ function verifierFor(config: ResolvedAuthConfig, options: VerifierOptions): Toke
     }
     throw new errors.JWKSNoMatchingKey();
   };
+  const requireAudience = config.requireAudience !== false;
   return {
     async verify(token) {
       try {
         const { payload } = await jwtVerify(token, getKey, {
           algorithms: config.algorithms,
           issuer: config.issuer,
-          audience: config.audience,
-          requiredClaims: ['exp', 'sub', 'iss', 'aud'],
+          ...(requireAudience ? { audience: config.audience } : {}),
+          requiredClaims: requireAudience ? ['exp', 'sub', 'iss', 'aud'] : ['exp', 'sub', 'iss'],
         });
         if (!nonempty(payload.sub)) throw new InvalidTokenError();
+        if (config.authorizedParties && !(typeof payload.azp === 'string' && config.authorizedParties.includes(payload.azp))) {
+          throw new InvalidTokenError();
+        }
         return { sub: payload.sub, claims: payload };
       } catch (error) {
         if (error instanceof KeyFetchError) throw error;

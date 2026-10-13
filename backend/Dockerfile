@@ -1,5 +1,5 @@
-# Use Node.js 20 Docker image as base
-FROM node:20
+# Use Node.js 24 Docker image as base
+FROM node:24
 
 ENV DATABASE_URI=
 # Either 'mongodb', 'postgres', 'mssql' or 'mysql'. This defaults to Postgres

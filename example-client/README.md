@@ -35,9 +35,9 @@ The modular connector reads these variables through `import.meta.env`. Adapt
 | `VITE_BATCH_MAX_OPERATIONS` | Operation threshold for collecting transactions (default 1000) |
 | `VITE_REQUEST_TIMEOUT_MS` | Write request timeout in milliseconds (default 30000) |
 
-See [.env.example](.env.example). Set `VITE_BATCH_MAX_TRANSACTIONS` to a positive integer to
-use a custom operation threshold; otherwise the modular connector uses both batch defaults.
-The API rejects batches larger than 50 transactions. The operation threshold can be exceeded
+See [.env.example](.env.example). Batching is enabled only when `VITE_BATCH_MAX_TRANSACTIONS`
+is a positive integer; `VITE_BATCH_MAX_OPERATIONS` is then optional. Otherwise the connector
+uploads one transaction per request. The API rejects batches larger than 50 transactions. The operation threshold can be exceeded
 by the last transaction collected because the connector does not split transactions.
 
 The single-file connector uses constants at the top instead of environment variables.
@@ -62,7 +62,7 @@ instance trusts. The demo `fetchAuthToken()` returns a fixed token (`VITE_POWERS
 Both sync and writes reuse it.
 
 For a provider integration, edit the private `fetchAuthToken()` method in your copied connector.
-See [Supabase and Clerk](../docs/auth-verifiers.md). If using different tokens for sync and writes,
+See [Supabase and Clerk](../docs/auth/providers.md). If using different tokens for sync and writes,
 also adapt `fetchCredentials()`, keeping the same user ID in both tokens.
 
 The modular transport's token callback is `getAuthToken`; its timeout option is `timeoutMs`.
@@ -84,5 +84,5 @@ pnpm --dir backend generate-types
 ```
 
 This updates both generated clients. The single-file version has hand-written types; update
-those and its behavior using [the maintenance instructions](src/PowersyncConnector.singlefile.prompt.md).
+those and its behavior using [the maintenance instructions](../docs/single-file-connector-maintenance.md).
 Keep both versions consistent and run `pnpm --dir backend test`.
