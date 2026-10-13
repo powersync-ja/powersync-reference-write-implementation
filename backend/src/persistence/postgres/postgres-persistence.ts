@@ -1,4 +1,5 @@
 import { FatalOperationError } from '../../errors.js';
+import { assertNoQuoteCharacters } from '../identifiers.js';
 import { URL } from 'url';
 import PG from 'pg';
 import type { Persister, CrudEntry } from '../../types.js';
@@ -10,7 +11,8 @@ import type { AuthContext } from '../../auth/types.js';
 const { Pool } = PG;
 
 function escapeIdentifier(identifier: string): string {
-  return `"${identifier.replace(/"/g, '""').replace(/\./g, '"."')}"`;
+  assertNoQuoteCharacters(identifier, ['"']);
+  return `"${identifier.replace(/\./g, '"."')}"`;
 }
 
 export const createPostgresPersister = (uri: string, mapper: EntryMapper = defaultMapper): Persister => {

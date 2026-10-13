@@ -1,4 +1,5 @@
 import { FatalOperationError } from '../../errors.js';
+import { assertNoQuoteCharacters } from '../identifiers.js';
 import { URL } from 'url';
 import sql from 'mssql';
 import type { Persister, CrudEntry } from '../../types.js';
@@ -8,6 +9,7 @@ import { defaultMapper } from '../../mapping/default.js';
 import type { AuthContext } from '../../auth/types.js';
 
 function escapeIdentifier(identifier: string): string {
+  assertNoQuoteCharacters(identifier, ['[', ']']);
   return `[${identifier}]`;
 }
 
@@ -52,10 +54,11 @@ export const createMSSQLPersister = async (uri: string, mapper: EntryMapper = de
             if (mapped.op == 'PUT') {
               const with_id: Record<string, unknown> = { ...mapped.data, id: mapped.id };
 
+              // Parameters are positional: column names are never part of a parameter name.
               const columnNames = Object.keys(with_id);
               const columnsEscaped = columnNames.map(escapeIdentifier);
               const columns = columnsEscaped.join(', ');
-              const columnParamaters = columnNames.map((c) => `@${c}`).join(', ');
+              const columnParamaters = columnNames.map((_, i) => `@p${i}`).join(', ');
               const sourceColumns = columnsEscaped.map((column) => `source.${column}`).join(', ');
 
               const updateClauses: string[] = [];
@@ -79,23 +82,13 @@ export const createMSSQLPersister = async (uri: string, mapper: EntryMapper = de
             `;
 
               const request = transaction.request();
-              for (const column of columnNames) {
-                request.input(column, with_id[column]);
-              }
+              columnNames.forEach((column, i) => request.input(`p${i}`, with_id[column]));
               await request.query(statement);
             } else if (mapped.op == 'PATCH') {
-              const with_id: Record<string, unknown> = { ...mapped.data, id: mapped.id };
+              const fields = Object.entries(mapped.data).filter(([key]) => key != 'id');
+              if (fields.length === 0) continue;
 
-              const updateClauses: string[] = [];
-
-              for (const key of Object.keys(mapped.data)) {
-                if (key == 'id') {
-                  continue;
-                }
-                updateClauses.push(`${escapeIdentifier(key)} = @${key}`);
-              }
-
-              if (updateClauses.length === 0) continue;
+              const updateClauses = fields.map(([key], i) => `${escapeIdentifier(key)} = @p${i}`);
 
               const statement = `
               UPDATE ${table}
@@ -103,9 +96,8 @@ export const createMSSQLPersister = async (uri: string, mapper: EntryMapper = de
               WHERE id = @id`;
 
               const request = transaction.request();
-              for (const column of Object.keys(with_id)) {
-                request.input(column, with_id[column]);
-              }
+              fields.forEach(([, value], i) => request.input(`p${i}`, value));
+              request.input('id', mapped.id);
 
               await request.query(statement);
             } else if (mapped.op == 'DELETE') {

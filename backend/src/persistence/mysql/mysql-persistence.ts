@@ -1,4 +1,5 @@
 import { FatalOperationError } from '../../errors.js';
+import { assertNoQuoteCharacters } from '../identifiers.js';
 import mysql from 'mysql2/promise';
 import type { Persister, CrudEntry } from '../../types.js';
 import { classifyMySQLError } from './mysql-errors.js';
@@ -8,7 +9,8 @@ import { defaultMapper } from '../../mapping/default.js';
 import type { AuthContext } from '../../auth/types.js';
 
 function escapeIdentifier(identifier: string): string {
-  return `\`${identifier.replace(/`/g, '``').replace(/\./g, '`.`')}\``;
+  assertNoQuoteCharacters(identifier, ['`']);
+  return `\`${identifier.replace(/\./g, '`.`')}\``;
 }
 
 export const createMySQLPersister = (uri: string, mapper: EntryMapper = defaultMapper): Persister => {

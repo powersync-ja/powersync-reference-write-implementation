@@ -9,7 +9,8 @@ const db = vi.hoisted(() => ({
   persist: vi.fn(),
   connect: vi.fn(),
   begin: vi.fn(),
-  release: vi.fn()
+  release: vi.fn(),
+  input: vi.fn()
 }));
 vi.mock('pg', () => ({
   default: {
@@ -54,7 +55,7 @@ vi.mock('mssql', () => ({
           begin: async () => {},
           commit: db.commit,
           rollback: db.rollback,
-          request: () => ({ input() {}, query: db.operation })
+          request: () => ({ input: db.input, query: db.operation })
         };
       }
     }
@@ -85,6 +86,7 @@ import { createPostgresPersister } from './src/persistence/postgres/postgres-per
 import { createMySQLPersister } from './src/persistence/mysql/mysql-persistence.js';
 import { createMSSQLPersister } from './src/persistence/mssql/mssql-persistence.js';
 import { createMongoPersister } from './src/persistence/mongo/mongo-persistence.js';
+import { factories } from './src/persistence/persister-factories.js';
 import type { EntryMapper } from './src/mapping/types.js';
 import { defaultMapper } from './src/mapping/default.js';
 
@@ -101,6 +103,7 @@ beforeEach(() => {
   db.connect.mockReset().mockResolvedValue(undefined);
   db.begin.mockReset().mockResolvedValue(undefined);
   db.release.mockReset();
+  db.input.mockReset();
 });
 describe('Postgres connection recovery', () => {
   it.each(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', '08006'])(
@@ -195,4 +198,68 @@ it('Mongo missing-schema failure rolls back before shared routing once', async (
   expect(notify).toHaveBeenCalledOnce();
   expect(db.operation).not.toHaveBeenCalled();
   notify.mockRestore();
+});
+
+describe.each(['postgres', 'mysql', 'mssql', 'mongodb'])('%s identifier validation', (name) => {
+  it.each([
+    ['table', { op: 'PUT' as const, id: '1', table: 'items; DROP TABLE users', op_data: { a: 1 } }],
+    ['schema-qualified table', { op: 'PUT' as const, id: '1', table: 'other.items', op_data: { a: 1 } }],
+    ['bracket in column', { op: 'PATCH' as const, id: '1', table: 'items', op_data: { 'a]; DROP TABLE x--': 1 } }],
+    ['operator column', { op: 'PATCH' as const, id: '1', table: 'items', op_data: { $where: 1 } }]
+  ])('rejects a hostile %s before any database work', async (_label, hostile) => {
+    const persister = await factories[name]('postgres://user:pass@localhost:5432/db');
+    const error = await persister.updateBatch([batch[0], hostile], auth).catch((e) => e);
+    expect(error).toBeInstanceOf(FatalOperationError);
+    expect(error).toMatchObject({ errorCode: 'INVALID_DATA', operationIndex: 1 });
+    // The whole transaction is refused up front: not even the valid first operation runs.
+    expect(db.operation).not.toHaveBeenCalled();
+    expect(db.begin).not.toHaveBeenCalled();
+    expect(db.connect).not.toHaveBeenCalled();
+  });
+
+  it('passes safe transactions and a custom mapper through', async () => {
+    const mapper: EntryMapper = (op) => ({ table: 'renamed', op: op.op, id: op.id, data: {} });
+    db.schema.mockResolvedValue({ renamed: {} });
+    const persister = await factories[name]('postgres://user:pass@localhost:5432/db', mapper);
+    await persister.updateBatch(batch, auth);
+    expect(db.commit).toHaveBeenCalledOnce();
+  });
+});
+
+describe.each([
+  ['postgres', '"'],
+  ['mysql', '`'],
+  ['mssql', '['],
+  ['mssql', ']']
+])('%s mapper output containing %s', (name, quote) => {
+  it.each([
+    ['table', { table: `we${quote}ird`, data: { a: 1 } }],
+    ['column', { table: 'items', data: { [`col${quote}x`]: 1 } }]
+  ])('is refused in a %s name', async (_label, mapped) => {
+    const mapper: EntryMapper = (op) => ({ ...mapped, op: op.op, id: op.id });
+    const persister = await factories[name]('postgres://user:pass@localhost:5432/db', mapper);
+    const error = await persister
+      .updateBatch([{ op: 'PUT', id: '7', table: 'items', op_data: { a: 1 } }], auth)
+      .catch((e) => e);
+    expect(error).toMatchObject({ errorCode: 'INVALID_DATA', operationIndex: 0 });
+    expect(db.operation).not.toHaveBeenCalled();
+    expect(db.commit).not.toHaveBeenCalled();
+  });
+});
+
+describe('mssql statements', () => {
+  it('uses positional parameters', async () => {
+    const mapper: EntryMapper = (op) => ({ table: 'renamed', op: op.op, id: op.id, data: { 'col x': 1, plain: 2 } });
+    const persister = await createMSSQLPersister('mssql://user:pass@localhost:1433/db', mapper);
+    await persister.updateBatch([{ op: 'PATCH', id: '7', table: 'items', op_data: { a: 1 } }], auth);
+    const sql = db.operation.mock.calls[0][0] as string;
+    expect(sql).toContain('[renamed]');
+    expect(sql).toContain('[col x] = @p0');
+    expect(sql).toContain('[plain] = @p1');
+    expect(db.input.mock.calls).toEqual([
+      ['p0', 1],
+      ['p1', 2],
+      ['id', '7']
+    ]);
+  });
 });
