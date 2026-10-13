@@ -45,3 +45,11 @@ export function supplementsFromEnv(env: NodeJS.ProcessEnv = process.env): AuthSu
   // The resolver treats a missing key and an undefined one differently in a few places; omit unset keys.
   return Object.fromEntries(Object.entries(candidates).filter(([, value]) => value !== undefined)) as AuthSupplements;
 }
+
+/** `cloud` (default) reads a PowerSync Cloud export; `self-hosted` uses AUTH_* variables alone. */
+export function authModeFromEnv(env: NodeJS.ProcessEnv = process.env): 'cloud' | 'self-hosted' {
+  const mode = env.AUTH_MODE?.trim();
+  if (!mode || mode === 'cloud') return 'cloud';
+  if (mode === 'self-hosted') return 'self-hosted';
+  throw new AuthConfigurationError(`Set AUTH_MODE to "cloud" or "self-hosted" (got "${mode}").`);
+}

@@ -47,6 +47,7 @@ AUTH_INSTANCE_URL=https://your-instance.powersync.example.com
 | `AUTH_ISSUER` | Any generic (non-Supabase) provider. PowerSync never validates `iss`, so the expected issuer comes from your own settings, not the export. |
 | `AUTH_INSTANCE_URL` | Generic Cloud imports: your PowerSync instance URL is the default audience, and the export does not contain it. |
 | `AUTH_AUDIENCE` | Instead of `AUTH_INSTANCE_URL`, to state the accepted audiences explicitly. Must include any exported `additional_audiences`. |
+| `AUTH_MODE=self-hosted` | No PowerSync Cloud export; see [self-hosted](#self-hosted-powersync-or-any-other-provider). |
 | `AUTH_PROVIDER=supabase`, `AUTH_SUPABASE_URL` | Supabase behind a custom domain, or when project detection is ambiguous. Standard hosted Supabase usually needs none. |
 | `AUTH_JWKS_URI` | The export has no key endpoint. It cannot override a different exported URI. |
 | `AUTH_JWKS_URI_OVERRIDE` | The exported endpoint is written from the PowerSync service's network view (for example `http://backend:6060/...`) and your backend reaches the keys at a different address. Inline public keys are unchanged. |
@@ -78,42 +79,38 @@ Startup calls `initializeVerifier()` before listening. Invalid configuration pro
 does not test their availability. Configuration and inline keys are cached per process; restart
 after changing them. Remote keys refresh according to the cache policy.
 
-## Self-hosted PowerSync
+## Self-hosted PowerSync (or any other provider)
 
-Use the configuration that runs your PowerSync service. Parse its YAML and resolve `!env`
-references in your own loading code, or save the already-resolved configuration as JSON.
-The repository does not include a YAML parser or a service configuration file.
+Set `AUTH_MODE=self-hosted` to configure the verifier from environment variables alone. No
+export file is read and no code needs editing. Copy the values from the `client_auth` section of
+your PowerSync service configuration, in the root `.env`, `.env.local`, or `backend/.env`:
 
-For the JSON approach, save the resolved service configuration in `backend/powersync-config.json`.
-It has `client_auth` at the top level, without the Cloud `config` wrapper. For example:
-
-```json
-{
-  "client_auth": {
-    "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
-    "audience": ["powersync-app"]
-  }
-}
+```sh
+AUTH_MODE=self-hosted
+AUTH_ISSUER=https://issuer.example.com
+AUTH_AUDIENCE=powersync-app
+AUTH_JWKS_URI=https://issuer.example.com/.well-known/jwks.json
 ```
 
-Adapt `backend/src/auth/verifier.ts` as follows:
+| Variable | Meaning |
+| --- | --- |
+| `AUTH_JWKS_URI` | Required. Your provider's key endpoint (`client_auth.jwks_uri`). |
+| `AUTH_ISSUER` | Required. PowerSync never checks `iss`, so state the issuer you expect. |
+| `AUTH_AUDIENCE` | Required. The complete accepted audience list, comma-separated (`client_auth.audience`). |
+| `AUTH_JWKS_URI_OVERRIDE` | Optional. Read keys from this address instead, when the backend reaches the provider differently than PowerSync does. |
 
-1. Import `resolveSelfHostedAuth` in place of `resolvePowerSyncAuth` from `./verifier/index.js`.
-2. Keep file loading, JSON parsing, diagnostic handling, and `createTokenVerifier(result.config)`.
-3. Replace the resolver call with `resolveSelfHostedAuth(dump, supplementsFromEnv())`.
-4. Set `AUTH_ISSUER` to your expected issuer, for example `https://issuer.example.com`. Leave the
-   Cloud-only `AUTH_INSTANCE_URL`, `AUTH_JWKS_URI`, `AUTH_PROVIDER` and `AUTH_SUPABASE_URL` unset.
-5. Update the loader's file-error messages to refer to your service JSON instead of a Cloud export.
-   Keep the `initializeVerifier` and `verifier` exports used by the application.
+The other `AUTH_*` variables for HTTP trust and algorithms apply as well. `AUTH_INSTANCE_URL`,
+`AUTH_SUPABASE_URL` and `AUTH_PROVIDER=supabase` are Cloud-only and are rejected in this mode.
 
-The existing Compose mount can carry this JSON file after the loader is adapted. Rebuild the
-image, or restart the development process, after changing the loader.
+Docker Compose still bind-mounts `POWERSYNC_CONFIG_PATH` and refuses to start if the file is
+missing, even though this mode ignores it. Create a placeholder: `echo '{}' > backend/powersync-config.json`.
 
-`client_auth.audience` is the complete audience list for this resolver. Use `jwksUriOverride`
-when the backend needs a different endpoint address. The resolver does not support the
-self-hosted `supabase: true` mode's separate audience policy. For Supabase, omit that flag
-and configure `client_auth.jwks_uri` and `client_auth.audience: ["authenticated"]` directly;
-supply the project's `/auth/v1` issuer. See [PowerSync's manual configuration](https://docs.powersync.com/configuration/auth/supabase-auth#manual-jwks-configuration).
+Inline public keys (`client_auth.jwks`) cannot be given through variables. If your provider
+publishes no key endpoint, adapt `backend/src/auth/verifier.ts` to call `resolveSelfHostedAuth`
+with a service configuration that contains them. The resolver does not support the self-hosted
+`supabase: true` mode's separate audience policy. For Supabase, set `AUTH_JWKS_URI` to the
+project's `/auth/v1/.well-known/jwks.json`, `AUTH_AUDIENCE=authenticated` and `AUTH_ISSUER` to
+the project's `/auth/v1` URL. See [PowerSync's manual configuration](https://docs.powersync.com/configuration/auth/supabase-auth#manual-jwks-configuration).
 
 ## Verification behavior
 

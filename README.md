@@ -54,9 +54,8 @@ Choose an integration:
 - **PowerSync Cloud:** export your config to `backend/powersync-config.json` and set any
   `AUTH_*` supplements; see [auth setup](docs/auth/setup.md). Supabase with asymmetric
   signing keys is supported by this path.
-- **Self-hosted PowerSync:** adapt the loader to use `resolveSelfHostedAuth`, as described in
-  [auth setup](docs/auth/setup.md#self-hosted-powersync). The default loader does not read
-  YAML or detect self-hosted configuration automatically.
+- **Self-hosted PowerSync or another provider:** set `AUTH_MODE=self-hosted` with your issuer,
+  audience and JWKS URL. See [auth setup](docs/auth/setup.md#self-hosted-powersync-or-any-other-provider).
 - **Custom provider:** preserve the startup and request exports when replacing the verifier.
   See [Supabase and Clerk integration](docs/auth/verifiers.md).
 
