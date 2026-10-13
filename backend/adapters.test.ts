@@ -263,3 +263,22 @@ describe('mssql statements', () => {
     ]);
   });
 });
+
+describe('MSSQL URI parsing', () => {
+  it('decodes credentials, defaults port, verifies certificates', async () => {
+    const { parseMSSQLUri } = await import('./src/persistence/mssql/mssql-persistence.js');
+    const config = parseMSSQLUri('mssql://us%40er:p%3Ass%2Fw%23rd@localhost/db');
+    expect(config.user).toBe('us@er');
+    expect(config.password).toBe('p:ss/w#rd');
+    expect(config.port).toBe(1433);
+    expect(config.database).toBe('db');
+    expect(config.options?.trustServerCertificate).toBe(false);
+  });
+
+  it('honours explicit trustServerCertificate', async () => {
+    const { parseMSSQLUri } = await import('./src/persistence/mssql/mssql-persistence.js');
+    const config = parseMSSQLUri('mssql://u:p@h:1444/db?trustServerCertificate=true');
+    expect(config.port).toBe(1444);
+    expect(config.options?.trustServerCertificate).toBe(true);
+  });
+});

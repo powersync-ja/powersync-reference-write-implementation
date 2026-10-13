@@ -13,22 +13,43 @@ function escapeIdentifier(identifier: string): string {
   return `[${identifier}]`;
 }
 
+function booleanParam(params: URLSearchParams, name: string, fallback: boolean): boolean {
+  const value = params.get(name);
+  if (value === null) return fallback;
+  const normalized = value.toLowerCase();
+  if (['true', '1', 'yes'].includes(normalized)) return true;
+  if (['false', '0', 'no'].includes(normalized)) return false;
+  throw new Error(`Invalid value for MSSQL URI parameter ${name}: ${value}`);
+}
+
+/**
+ * Parses mssql://user:pass@host[:port]/database[?encrypt=true&trustServerCertificate=false].
+ * Credentials are percent-decoded. Certificates are verified unless trustServerCertificate=true
+ * is set explicitly (e.g. for local development with a self-signed certificate).
+ */
+export function parseMSSQLUri(uri: string): sql.config {
+  const url = new URL(uri);
+  const database = decodeURIComponent(url.pathname.split('/')[1] ?? '');
+  return {
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    server: url.hostname,
+    port: url.port ? parseInt(url.port, 10) : 1433,
+    database: database || undefined,
+    connectionTimeout: 15_000,
+    requestTimeout: 30_000,
+    pool: { max: 10, min: 0, idleTimeoutMillis: 30_000 },
+    options: {
+      encrypt: booleanParam(url.searchParams, 'encrypt', true),
+      trustServerCertificate: booleanParam(url.searchParams, 'trustServerCertificate', false)
+    }
+  };
+}
+
 export const createMSSQLPersister = async (uri: string, mapper: EntryMapper = defaultMapper): Promise<Persister> => {
   console.debug('Using MSSQL Persister');
 
-  const url = new URL(uri);
-
-  const pool = new sql.ConnectionPool({
-    user: url.username,
-    password: url.password,
-    server: url.hostname,
-    port: parseInt(url.port),
-    database: url.pathname.split('/')[1],
-    options: {
-      encrypt: true,
-      trustServerCertificate: true
-    }
-  });
+  const pool = new sql.ConnectionPool(parseMSSQLUri(uri));
 
   pool.on('error', (err: Error) => {
     console.error('MSSQL pool connection failure', err);
