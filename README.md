@@ -29,7 +29,9 @@ Set these in `.env.local` (or the root `.env` for shared defaults) for Docker Co
 | Variable | Meaning |
 | --- | --- |
 | `DATABASE_TYPE` | `postgres` (default), `mongodb`, `mysql`, or `mssql` |
-| `DATABASE_URI` | Required connection string for your source database. For Postgres, the full URI is passed to `pg`, so options such as `sslmode` apply |
+| `DATABASE_URI` | Required connection string for your source database |
+
+Connection string notes: percent-encode special characters in passwords. Postgres accepts `?sslmode=require` (or `verify-full`) for managed databases. MSSQL verifies the server certificate by default; add `?trustServerCertificate=true` only for self-signed development servers. Missing ports default to 5432 (Postgres) and 1433 (MSSQL). Pools are capped at 10 connections with connect and statement timeouts.
 | `BATCH_ON_FATAL_ERROR` | `stop` (default) or `skip`; see [error handling](docs/error-handling.md) |
 
 `.env` is committed, so keep it to shared defaults. Put this machine's values and any secret, such

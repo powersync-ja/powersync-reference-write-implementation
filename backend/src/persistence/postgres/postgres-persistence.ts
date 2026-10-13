@@ -1,4 +1,5 @@
 import { FatalOperationError } from '../../errors.ts';
+import { assertNoQuoteCharacters } from '../identifiers.ts';
 import PG from 'pg';
 import type { Persister, CrudEntry } from '../../types.ts';
 import { classifyPostgresError } from './postgres-errors.ts';
@@ -9,13 +10,15 @@ import type { AuthContext } from '../../auth/types.ts';
 const { Pool } = PG;
 
 function escapeIdentifier(identifier: string): string {
-  return `"${identifier.replace(/"/g, '""').replace(/\./g, '"."')}"`;
+  assertNoQuoteCharacters(identifier, ['"']);
+  return `"${identifier.replace(/\./g, '"."')}"`;
 }
 
 export interface PostgresPersisterOptions {
   /**
-   * Extra pg pool settings, such as max, connectionTimeoutMillis (acquisition wait), and
-   * statement_timeout. Unset fields keep pg defaults. The connection string still supplies
+   * pg pool settings, such as max, connectionTimeoutMillis (acquisition wait), and
+   * statement_timeout. Unset fields keep this adapter's defaults: max 10, 10 s connect, 30 s idle,
+   * 30 s statement timeout. The connection string still supplies
    * the host, credentials, database, and TLS options.
    *
    * statement_timeout is also applied transaction-locally after BEGIN. pg sends it as a
@@ -43,8 +46,18 @@ export const createPostgresPersister = (
   console.debug('Using Postgres Persister');
 
   const initializeTransaction = options.initializeTransaction ?? setAppUserId;
-  const pool = new Pool({ ...options.pool, connectionString: uri });
-  const statementTimeout = options.pool?.statement_timeout;
+  // pg parses the connection string itself: percent-encoded credentials are decoded, a missing
+  // port defaults to 5432, and sslmode (e.g. ?sslmode=require) is honoured.
+  const poolConfig: PG.PoolConfig = {
+    max: 10,
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000,
+    statement_timeout: 30_000,
+    ...options.pool,
+    connectionString: uri
+  };
+  const pool = new Pool(poolConfig);
+  const statementTimeout = poolConfig.statement_timeout;
 
   pool.on('error', (err, client) => {
     console.error('Pool connection failure to postgres:', err, client);

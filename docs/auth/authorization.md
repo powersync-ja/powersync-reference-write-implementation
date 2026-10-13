@@ -63,6 +63,9 @@ in `authorize()`, or check existing rows within the adapter's database transacti
 
 ## Postgres row-level security
 
+**This is Postgres only. The MongoDB, MySQL, and SQL Server adapters do not set an
+identity value.**
+
 `createPostgresPersister` sets `app.user_id` from the verified subject at the start of
 each transaction:
 
@@ -73,5 +76,35 @@ await client.query('SELECT set_config($1, $2, true)', ['app.user_id', auth.sub])
 The `true` argument scopes the setting to that transaction. Your row-level security
 policies can read it with `current_setting('app.user_id', true)`.
 
-Define and enable policies for your schema and database role. This backend sets the
-identity value but does not create policies.
+**N.B. This backend sets the
+identity value but does not create policies.** You must define and enable policies for your schema and database role. 
+
+### Requirements for policies to take effect
+
+- **Connect as a non-owner role.** Table owners, superusers, and roles with `BYPASSRLS`
+  skip row-level security. If `DATABASE_URI` connects as one of these, policies are
+  silently ignored and `app.user_id` has no effect. Use a dedicated role that does not
+  own the tables and has only the grants it needs.
+- **Or force RLS on owned tables.** `ALTER TABLE todos FORCE ROW LEVEL SECURITY` applies
+  policies to the table owner too. Superusers and `BYPASSRLS` roles are still exempt.
+- **Enable RLS and write policies.** A table without `ENABLE ROW LEVEL SECURITY` ignores
+  its policies. With RLS enabled and no matching policy, all access is denied.
+- **Cover every operation the connector issues.** PUT is an upsert, so it needs
+  `INSERT` and `UPDATE` policies. PATCH needs `UPDATE`, and DELETE needs `DELETE`.
+  Include `WITH CHECK` so writes cannot assign rows to another user.
+
+Example:
+
+```sql
+ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY todos_owner ON todos
+  USING (owner_id = current_setting('app.user_id', true))
+  WITH CHECK (owner_id = current_setting('app.user_id', true));
+
+CREATE ROLE api_writer LOGIN PASSWORD '...';
+GRANT SELECT, INSERT, UPDATE, DELETE ON todos TO api_writer;
+```
+
+Adjust the column and type casts to your schema. If `owner_id` is a `uuid`, compare with
+`current_setting('app.user_id', true)::uuid`.

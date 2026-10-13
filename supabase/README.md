@@ -128,7 +128,9 @@ Redeploy after editing.
 
 PATCH and DELETE that match no visible row succeed without changing anything, the same as
 the Express backend. A row hidden by RLS counts as no match. A write that violates a policy or
-lacks a grant returns a fatal `UNAUTHORIZED` result.
+lacks a grant returns a fatal `UNAUTHORIZED` result. Client table and column names must be plain
+identifiers, the same as for the Express backend; see
+[identifier validation](../docs/schema-mapping.md#identifier-validation).
 
 ## Signing keys
 

@@ -16,6 +16,16 @@ createPostgresPersister(uri, myCustomMapper);
 
 The factories are configured in `backend/src/persistence/persister-factories.ts`.
 
+## Identifier validation
+
+Before the mapper runs, the wrappers in `backend/src/persistence/persister-factories.ts` check the client-supplied table name and each `op_data`
+key against `^[A-Za-z_][A-Za-z0-9_]*$` (at most 63 characters; see
+`backend/src/persistence/identifiers.ts`). A name that fails, such as `my-table`, `public.todos`
+or `$where`, rejects the transaction with an `INVALID_DATA` fatal error and the operation index.
+Rename the client table or column, or accept the plain name and map it to the real one in a
+custom mapper. Names a mapper returns are not subject to this check, so a mapper can target
+`myschema.todos`; the adapters still escape them.
+
 ## Default mapping
 
 Postgres, MySQL, and SQL Server use `defaultMapper`. It preserves table and field
@@ -110,12 +120,13 @@ table. Skipped operations are not an error.
 ### Installing it
 
 Factories take `(uri, mapper?)` and are stored in a record, so wrap the one you want. Edit
-`backend/src/persistence/persister-factories.ts`:
+`unvalidatedFactories` in `backend/src/persistence/persister-factories.ts`. The exported
+`factories` wraps every entry with identifier validation, including yours:
 
 ```ts
 import { renamingMapper } from '../mapping/renames.js';
 
-export const factories: Record<string, PersisterFactory> = {
+const unvalidatedFactories: Record<string, PersisterFactory> = {
   mongodb: createMongoPersister,
   postgres: createPostgresPersister,
   mysql: (uri) => createMySQLPersister(uri, renamingMapper),

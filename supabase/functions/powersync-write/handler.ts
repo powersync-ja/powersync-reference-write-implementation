@@ -1,3 +1,4 @@
+import { assertSafeTransaction } from '../../../backend/src/persistence/identifiers.ts';
 import { createPostgresPersister } from '../../../backend/src/persistence/postgres/postgres-persistence.ts';
 import { createTransactionProcessor, type TransactionProcessor } from '../../../backend/src/write/processor.ts';
 import { validateBatchBody } from '../../../backend/src/write/validate-batch.ts';
@@ -20,8 +21,16 @@ const getProcessor = (): TransactionProcessor => {
       pool,
       initializeTransaction: asAuthenticatedUser
     });
+    // Rejects unsafe client table and column names before any database work, like the Express
+    // backend's persister factories. See docs/schema-mapping.md#identifier-validation.
+    const validated = {
+      updateBatch: async (...args: Parameters<typeof persister.updateBatch>) => {
+        assertSafeTransaction(args[0]);
+        return persister.updateBatch(...args);
+      }
+    };
     processor = createTransactionProcessor({
-      persister: () => persister,
+      persister: () => validated,
       authorizer,
       fatalErrorHandler,
       batchOnFatalError: () => batchOnFatalError,

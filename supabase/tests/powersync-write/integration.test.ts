@@ -105,6 +105,18 @@ Deno.test({
       assertEquals((await admin.query('select count(*)::int as n from lists where id = any($1)', [lists])).rows[0].n, 49);
     });
 
+    await t.step('rejects unsafe table and column names before writing', async () => {
+      const list = id();
+      const res = await post(a.token, batch([put('lists', list, { name: 'ok' }), put('auth.users', id(), { email: 'x' })]));
+      assertEquals(res.body.results[0].status, 'fatal_error');
+      assertEquals(res.body.results[0].failed_operation.error_code, 'INVALID_DATA');
+      assertEquals(res.body.results[0].failed_operation.operation_index, 1);
+      assertEquals(await listRow(list), undefined);
+
+      const col = await post(a.token, batch([put('lists', id(), { name: 'x', 'owner id': 'y' })]));
+      assertEquals(col.body.results[0].failed_operation.error_code, 'INVALID_DATA');
+    });
+
     await t.step('serves only the data route', async () => {
       const res = await postBody(a.token, '{}', `${FUNCTION_URL}/elsewhere`);
       assertEquals(res.status, 404);

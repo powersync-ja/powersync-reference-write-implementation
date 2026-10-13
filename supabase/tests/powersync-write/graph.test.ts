@@ -25,6 +25,7 @@ Deno.test('function import graph contains only the edge modules', async () => {
     'backend/src/generated/transaction-batch-validator.ts',
     'backend/src/mapping/default.ts',
     'backend/src/mapping/types.ts',
+    'backend/src/persistence/identifiers.ts',
     'backend/src/persistence/postgres/postgres-errors.ts',
     'backend/src/persistence/postgres/postgres-persistence.ts',
     'backend/src/types.ts',

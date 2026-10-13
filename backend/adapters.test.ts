@@ -11,7 +11,8 @@ const db = vi.hoisted(() => ({
   begin: vi.fn(),
   release: vi.fn(),
   poolConfig: vi.fn(),
-  setConfig: vi.fn()
+  setConfig: vi.fn(),
+  input: vi.fn()
 }));
 vi.mock('pg', () => ({
   default: {
@@ -59,7 +60,7 @@ vi.mock('mssql', () => ({
           begin: async () => {},
           commit: db.commit,
           rollback: db.rollback,
-          request: () => ({ input() {}, query: db.operation })
+          request: () => ({ input: db.input, query: db.operation })
         };
       }
     }
@@ -90,6 +91,7 @@ import { createPostgresPersister } from './src/persistence/postgres/postgres-per
 import { createMySQLPersister } from './src/persistence/mysql/mysql-persistence.ts';
 import { createMSSQLPersister } from './src/persistence/mssql/mssql-persistence.ts';
 import { createMongoPersister } from './src/persistence/mongo/mongo-persistence.ts';
+import { factories } from './src/persistence/persister-factories.ts';
 import type { EntryMapper } from './src/mapping/types.ts';
 import { defaultMapper } from './src/mapping/default.ts';
 
@@ -108,6 +110,7 @@ beforeEach(() => {
   db.release.mockReset();
   db.poolConfig.mockReset();
   db.setConfig.mockReset();
+  db.input.mockReset();
 });
 describe('Postgres connection recovery', () => {
   it.each(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', '08006'])(
@@ -150,11 +153,18 @@ describe('Postgres connection recovery', () => {
   it('passes the full connection string and pool settings to pg', () => {
     const uri = 'postgres://us%40er:p%3Ass@db.example.com:6543/postgres?sslmode=verify-full';
     createPostgresPersister(uri, defaultMapper, { pool: { max: 2, statement_timeout: 5000 } });
-    expect(db.poolConfig).toHaveBeenLastCalledWith({ connectionString: uri, max: 2, statement_timeout: 5000 });
+    expect(db.poolConfig).toHaveBeenLastCalledWith({
+      connectionString: uri,
+      max: 2,
+      connectionTimeoutMillis: 10_000,
+      idleTimeoutMillis: 30_000,
+      statement_timeout: 5000
+    });
   });
   it('sets app.user_id by default and runs a custom transaction initializer instead when given', async () => {
     await createPostgresPersister('postgres://user:pass@localhost:5432/db').updateBatch(batch, auth);
-    expect(db.setConfig).toHaveBeenCalledOnce();
+    // The default 30 s statement timeout, then app.user_id.
+    expect(db.setConfig.mock.calls.map(([, params]) => params)).toEqual([['30000'], ['app.user_id', auth.sub]]);
 
     db.setConfig.mockReset();
     const initializeTransaction = vi.fn().mockResolvedValue(undefined);
@@ -163,7 +173,7 @@ describe('Postgres connection recovery', () => {
     });
     await persister.updateBatch(batch, auth);
     expect(initializeTransaction).toHaveBeenCalledWith(expect.objectContaining({ query: expect.any(Function) }), auth);
-    expect(db.setConfig).not.toHaveBeenCalled();
+    expect(db.setConfig.mock.calls.map(([, params]) => params)).toEqual([['30000']]);
     expect(db.begin.mock.invocationCallOrder[1]).toBeLessThan(initializeTransaction.mock.invocationCallOrder[0]);
   });
   it('applies statement_timeout inside each transaction, because transaction poolers drop startup parameters', async () => {
@@ -253,4 +263,87 @@ it('Mongo missing-schema failure rolls back before shared routing once', async (
   expect(notify).toHaveBeenCalledOnce();
   expect(db.operation).not.toHaveBeenCalled();
   notify.mockRestore();
+});
+
+describe.each(['postgres', 'mysql', 'mssql', 'mongodb'])('%s identifier validation', (name) => {
+  it.each([
+    ['table', { op: 'PUT' as const, id: '1', table: 'items; DROP TABLE users', op_data: { a: 1 } }],
+    ['schema-qualified table', { op: 'PUT' as const, id: '1', table: 'other.items', op_data: { a: 1 } }],
+    ['bracket in column', { op: 'PATCH' as const, id: '1', table: 'items', op_data: { 'a]; DROP TABLE x--': 1 } }],
+    ['operator column', { op: 'PATCH' as const, id: '1', table: 'items', op_data: { $where: 1 } }]
+  ])('rejects a hostile %s before any database work', async (_label, hostile) => {
+    const persister = await factories[name]('postgres://user:pass@localhost:5432/db');
+    const error = await persister.updateBatch([batch[0], hostile], auth).catch((e) => e);
+    expect(error).toBeInstanceOf(FatalOperationError);
+    expect(error).toMatchObject({ errorCode: 'INVALID_DATA', operationIndex: 1 });
+    // The whole transaction is refused up front: not even the valid first operation runs.
+    expect(db.operation).not.toHaveBeenCalled();
+    expect(db.begin).not.toHaveBeenCalled();
+    expect(db.connect).not.toHaveBeenCalled();
+  });
+
+  it('passes safe transactions and a custom mapper through', async () => {
+    const mapper: EntryMapper = (op) => ({ table: 'renamed', op: op.op, id: op.id, data: {} });
+    db.schema.mockResolvedValue({ renamed: {} });
+    const persister = await factories[name]('postgres://user:pass@localhost:5432/db', mapper);
+    await persister.updateBatch(batch, auth);
+    expect(db.commit).toHaveBeenCalledOnce();
+  });
+});
+
+describe.each([
+  ['postgres', '"'],
+  ['mysql', '`'],
+  ['mssql', '['],
+  ['mssql', ']']
+])('%s mapper output containing %s', (name, quote) => {
+  it.each([
+    ['table', { table: `we${quote}ird`, data: { a: 1 } }],
+    ['column', { table: 'items', data: { [`col${quote}x`]: 1 } }]
+  ])('is refused in a %s name', async (_label, mapped) => {
+    const mapper: EntryMapper = (op) => ({ ...mapped, op: op.op, id: op.id });
+    const persister = await factories[name]('postgres://user:pass@localhost:5432/db', mapper);
+    const error = await persister
+      .updateBatch([{ op: 'PUT', id: '7', table: 'items', op_data: { a: 1 } }], auth)
+      .catch((e) => e);
+    expect(error).toMatchObject({ errorCode: 'INVALID_DATA', operationIndex: 0 });
+    expect(db.operation).not.toHaveBeenCalled();
+    expect(db.commit).not.toHaveBeenCalled();
+  });
+});
+
+describe('mssql statements', () => {
+  it('uses positional parameters', async () => {
+    const mapper: EntryMapper = (op) => ({ table: 'renamed', op: op.op, id: op.id, data: { 'col x': 1, plain: 2 } });
+    const persister = await createMSSQLPersister('mssql://user:pass@localhost:1433/db', mapper);
+    await persister.updateBatch([{ op: 'PATCH', id: '7', table: 'items', op_data: { a: 1 } }], auth);
+    const sql = db.operation.mock.calls[0][0] as string;
+    expect(sql).toContain('[renamed]');
+    expect(sql).toContain('[col x] = @p0');
+    expect(sql).toContain('[plain] = @p1');
+    expect(db.input.mock.calls).toEqual([
+      ['p0', 1],
+      ['p1', 2],
+      ['id', '7']
+    ]);
+  });
+});
+
+describe('MSSQL URI parsing', () => {
+  it('decodes credentials, defaults port, verifies certificates', async () => {
+    const { parseMSSQLUri } = await import('./src/persistence/mssql/mssql-persistence.ts');
+    const config = parseMSSQLUri('mssql://us%40er:p%3Ass%2Fw%23rd@localhost/db');
+    expect(config.user).toBe('us@er');
+    expect(config.password).toBe('p:ss/w#rd');
+    expect(config.port).toBe(1433);
+    expect(config.database).toBe('db');
+    expect(config.options?.trustServerCertificate).toBe(false);
+  });
+
+  it('honours explicit trustServerCertificate', async () => {
+    const { parseMSSQLUri } = await import('./src/persistence/mssql/mssql-persistence.ts');
+    const config = parseMSSQLUri('mssql://u:p@h:1444/db?trustServerCertificate=true');
+    expect(config.port).toBe(1444);
+    expect(config.options?.trustServerCertificate).toBe(true);
+  });
 });

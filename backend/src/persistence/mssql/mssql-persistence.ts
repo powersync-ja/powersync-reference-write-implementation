@@ -1,4 +1,5 @@
 import { FatalOperationError } from '../../errors.ts';
+import { assertNoQuoteCharacters } from '../identifiers.ts';
 import { URL } from 'url';
 import sql from 'mssql';
 import type { Persister, CrudEntry } from '../../types.ts';
@@ -8,25 +9,47 @@ import { defaultMapper } from '../../mapping/default.ts';
 import type { AuthContext } from '../../auth/types.ts';
 
 function escapeIdentifier(identifier: string): string {
+  assertNoQuoteCharacters(identifier, ['[', ']']);
   return `[${identifier}]`;
+}
+
+function booleanParam(params: URLSearchParams, name: string, fallback: boolean): boolean {
+  const value = params.get(name);
+  if (value === null) return fallback;
+  const normalized = value.toLowerCase();
+  if (['true', '1', 'yes'].includes(normalized)) return true;
+  if (['false', '0', 'no'].includes(normalized)) return false;
+  throw new Error(`Invalid value for MSSQL URI parameter ${name}: ${value}`);
+}
+
+/**
+ * Parses mssql://user:pass@host[:port]/database[?encrypt=true&trustServerCertificate=false].
+ * Credentials are percent-decoded. Certificates are verified unless trustServerCertificate=true
+ * is set explicitly (e.g. for local development with a self-signed certificate).
+ */
+export function parseMSSQLUri(uri: string): sql.config {
+  const url = new URL(uri);
+  const database = decodeURIComponent(url.pathname.split('/')[1] ?? '');
+  return {
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    server: url.hostname,
+    port: url.port ? parseInt(url.port, 10) : 1433,
+    database: database || undefined,
+    connectionTimeout: 15_000,
+    requestTimeout: 30_000,
+    pool: { max: 10, min: 0, idleTimeoutMillis: 30_000 },
+    options: {
+      encrypt: booleanParam(url.searchParams, 'encrypt', true),
+      trustServerCertificate: booleanParam(url.searchParams, 'trustServerCertificate', false)
+    }
+  };
 }
 
 export const createMSSQLPersister = async (uri: string, mapper: EntryMapper = defaultMapper): Promise<Persister> => {
   console.debug('Using MSSQL Persister');
 
-  const url = new URL(uri);
-
-  const pool = new sql.ConnectionPool({
-    user: url.username,
-    password: url.password,
-    server: url.hostname,
-    port: parseInt(url.port),
-    database: url.pathname.split('/')[1],
-    options: {
-      encrypt: true,
-      trustServerCertificate: true
-    }
-  });
+  const pool = new sql.ConnectionPool(parseMSSQLUri(uri));
 
   pool.on('error', (err: Error) => {
     console.error('MSSQL pool connection failure', err);
@@ -52,10 +75,11 @@ export const createMSSQLPersister = async (uri: string, mapper: EntryMapper = de
             if (mapped.op == 'PUT') {
               const with_id: Record<string, unknown> = { ...mapped.data, id: mapped.id };
 
+              // Parameters are positional: column names are never part of a parameter name.
               const columnNames = Object.keys(with_id);
               const columnsEscaped = columnNames.map(escapeIdentifier);
               const columns = columnsEscaped.join(', ');
-              const columnParamaters = columnNames.map((c) => `@${c}`).join(', ');
+              const columnParamaters = columnNames.map((_, i) => `@p${i}`).join(', ');
               const sourceColumns = columnsEscaped.map((column) => `source.${column}`).join(', ');
 
               const updateClauses: string[] = [];
@@ -79,23 +103,13 @@ export const createMSSQLPersister = async (uri: string, mapper: EntryMapper = de
             `;
 
               const request = transaction.request();
-              for (const column of columnNames) {
-                request.input(column, with_id[column]);
-              }
+              columnNames.forEach((column, i) => request.input(`p${i}`, with_id[column]));
               await request.query(statement);
             } else if (mapped.op == 'PATCH') {
-              const with_id: Record<string, unknown> = { ...mapped.data, id: mapped.id };
+              const fields = Object.entries(mapped.data).filter(([key]) => key != 'id');
+              if (fields.length === 0) continue;
 
-              const updateClauses: string[] = [];
-
-              for (const key of Object.keys(mapped.data)) {
-                if (key == 'id') {
-                  continue;
-                }
-                updateClauses.push(`${escapeIdentifier(key)} = @${key}`);
-              }
-
-              if (updateClauses.length === 0) continue;
+              const updateClauses = fields.map(([key], i) => `${escapeIdentifier(key)} = @p${i}`);
 
               const statement = `
               UPDATE ${table}
@@ -103,9 +117,8 @@ export const createMSSQLPersister = async (uri: string, mapper: EntryMapper = de
               WHERE id = @id`;
 
               const request = transaction.request();
-              for (const column of Object.keys(with_id)) {
-                request.input(column, with_id[column]);
-              }
+              fields.forEach(([, value], i) => request.input(`p${i}`, value));
+              request.input('id', mapped.id);
 
               await request.query(statement);
             } else if (mapped.op == 'DELETE') {
