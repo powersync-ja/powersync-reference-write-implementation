@@ -43,7 +43,7 @@ export const createPostgresPersister = (uri: string, mapper: EntryMapper = defau
 
         // Expose the verified subject for this transaction. Application RLS policies can read
         // current_setting('app.user_id', true). Define policies for your tables as described
-        // in docs/authorization.md.
+        // in docs/auth/authorization.md.
         await client.query('SELECT set_config($1, $2, true)', ['app.user_id', auth.sub]);
 
         for (const [operationIndex, op] of batch.entries()) {

@@ -2,7 +2,7 @@
 
 The write API verifies bearer tokens through `TokenVerifier` and stores `{ sub, claims }`
 on `req.auth`. Its default verifier is configured from a PowerSync Cloud export; see
-[auth setup](../backend/src/auth/SETUP.md).
+[auth setup](setup.md).
 
 Choose a token format accepted by both the write API and your PowerSync instance.
 If you use separate tokens for sync and writes, both must identify the same user in `sub`.
@@ -11,7 +11,7 @@ If you use separate tokens for sync and writes, both must identify the same user
 
 Use the existing verifier with a PowerSync Cloud export configured for asymmetric Supabase
 Auth. Follow [PowerSync's Supabase setup](https://docs.powersync.com/configuration/auth/supabase-auth),
-then export the configuration as described in the [setup guide](../backend/src/auth/SETUP.md).
+then export the configuration as described in the [setup guide](setup.md).
 The resolver derives the issuer, audience, and JWKS URL for standard hosted projects.
 For custom domains or ambiguous project detection, set the `AUTH_*` supplements reported at startup
 (see the setup guide).

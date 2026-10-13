@@ -1,6 +1,6 @@
 # The write API, standalone. Assumes a hosted PowerSync instance and a database you already run —
 # this project owns neither. Set DATABASE_TYPE / DATABASE_URI in .env and export the instance's
-# auth config as described in backend/src/auth/SETUP.md.
+# auth config as described in docs/auth/setup.md.
 
 services:
   backend:
@@ -9,13 +9,8 @@ services:
     # Bounded on purpose. A configuration error exits 1, and `unless-stopped` would respawn it
     # forever, scrolling the message past. Three attempts still covers a transient crash.
     restart: on-failure:3
-    # The backend's configuration comes from two files, later wins:
-    #   .env        committed, shared defaults
-    #   .env.local  gitignored and optional: this machine's overrides and secrets (DATABASE_URI, ...)
-    # Everything in them reaches the container, including the audience/issuer for the tokens this
-    # backend mints (POWERSYNC_URL, JWT_ISSUER), which must match what your PowerSync instance
-    # expects (its custom-auth settings), not PowerSync's own connection URL. Unset values fall back
-    # to the backend's own defaults (DATABASE_TYPE postgres, BATCH_ON_FATAL_ERROR stop).
+    # Configuration comes from .env then .env.local (later wins); see the README. Everything in
+    # them reaches the container, including AUTH_*.
     # Do not list a variable under `environment:` below: it would override both files.
     env_file:
       - path: .env

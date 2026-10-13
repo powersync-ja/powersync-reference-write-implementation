@@ -1,6 +1,7 @@
 # Fatal errors and developer-managed dead letters
 
-Every fatal error defaults to backend handling. Replace the methods on
+Every fatal error defaults to backend handling, except `UNAUTHORIZED`, which stays queued on the
+client so a denied write is not lost. Replace the methods on
 `fatalErrorHandler` in `backend/src/fatal-error-handler.ts` to choose which errors need
 client intervention and deliver backend-directed failures to your own storage or service.
 Authorization failures reach this handler before persistence starts. If a database transaction
@@ -45,7 +46,7 @@ throw new FatalOperationError(
 );
 ```
 
-Existing two-argument calls remain valid. Codes can be any application string. `details`
+Codes can be any application string. `details`
 can be any JSON value; the API imposes no application-specific schema. Adapters attach the
 zero-based original operation index when a particular operation fails. Transaction-level
 failures, including commit failures, have no inferred operation index. Only include details
@@ -83,9 +84,7 @@ and `operation_index`. Success, retryable and not-attempted results do not carry
 Configure `BATCH_ON_FATAL_ERROR=stop` (default) or `skip` on the backend. This setting
 applies only to backend-directed fatal failures; client-directed and retryable failures
 always stop the batch. Restart the backend after changing it (recreate the container when
-using Docker Compose). The client cannot override this policy. Older clients may still send
-`on_fatal_error`, but it is ignored. Deployments previously requesting `skip` from the client
-must now set `BATCH_ON_FATAL_ERROR=skip` on the backend.
+using Docker Compose). The client cannot override this policy.
 
 Both example connectors expose the same hook. Override it in a subclass or edit your copied
 connector. `CrudTransaction` comes from the PowerSync SDK; `ClientHandledFatalResult` is exported
