@@ -54,6 +54,7 @@ export function resolvePowerSyncAuth(dump: unknown, supplements: AuthSupplements
   if (!auth) return { status: 'invalid', diagnostics: [{ code: 'INVALID', field: 'config.client_auth', message: 'Expected an auth configuration object.' }] };
   const trust = transport(supplements, diagnostics);
   supplementShapes(supplements, diagnostics);
+  if (supplements.requireAudience !== undefined || supplements.authorizedParties !== undefined) diagnostics.issue('unsupported', 'requireAudience', 'AUTH_REQUIRE_AUDIENCE and AUTH_AUTHORIZED_PARTIES apply only with AUTH_MODE=self-hosted.');
   if (auth.supabase !== undefined && typeof auth.supabase !== 'boolean') diagnostics.issue('invalid', 'config.client_auth.supabase', 'Expected a boolean.');
   if (auth.jwks_uri !== undefined && !nonempty(auth.jwks_uri)) diagnostics.issue('invalid', 'config.client_auth.jwks_uri', 'Expected one JWKS URI string in a Cloud export.');
   if (auth.supabase_jwt_secret !== undefined) diagnostics.issue('unsupported', 'config.client_auth.supabase_jwt_secret', 'Legacy shared-secret configuration is unsupported; export an asymmetric-only configuration.');

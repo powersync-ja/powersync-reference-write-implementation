@@ -19,6 +19,14 @@ export interface AuthSupplements {
   /** Needed for a custom-domain Supabase endpoint without the supabase flag. */
   provider?: 'supabase' | 'generic';
   algorithms?: string[];
+  /**
+   * Set false for providers whose tokens carry no `aud` (for example Clerk session tokens).
+   * Self-hosted resolver only, and only together with `authorizedParties`, which then bound
+   * which clients' tokens are accepted.
+   */
+  requireAudience?: boolean;
+  /** Accepted values of the `azp` claim (the client origin that obtained the token). */
+  authorizedParties?: string[];
   /** Allows HTTP only for localhost/loopback key endpoints. */
   allowLocalHttp?: boolean;
   /** Hostnames trusted for plain HTTP, matched exactly. No wildcards, ports or paths. */
@@ -32,7 +40,12 @@ export type KeySource =
 export interface ResolvedAuthConfig {
   provider: 'supabase' | 'generic';
   issuer: string;
+  /** Empty only when `requireAudience` is false. */
   audience: string[];
+  /** Defaults to true. When false, tokens need no `aud` and `authorizedParties` is required. */
+  requireAudience?: boolean;
+  /** When set, tokens must carry an `azp` claim equal to one of these. */
+  authorizedParties?: string[];
   algorithms: string[];
   sources: KeySource[];
   allowLocalHttp: boolean;

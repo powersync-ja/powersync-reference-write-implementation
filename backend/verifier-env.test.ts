@@ -29,6 +29,8 @@ describe('supplementsFromEnv', () => {
         AUTH_JWKS_URI: 'https://issuer.example.com/jwks.json',
         AUTH_JWKS_URI_OVERRIDE: 'http://host.docker.internal:3000/.well-known/jwks.json',
         AUTH_ALGORITHMS: 'RS256,ES256',
+        AUTH_REQUIRE_AUDIENCE: 'false',
+        AUTH_AUTHORIZED_PARTIES: 'http://localhost:5173, https://app.example.com',
         AUTH_ALLOW_LOCAL_HTTP: 'TRUE',
         AUTH_ALLOW_INSECURE_HTTP_HOSTS: 'host.docker.internal'
       })
@@ -41,6 +43,8 @@ describe('supplementsFromEnv', () => {
       jwksUri: 'https://issuer.example.com/jwks.json',
       jwksUriOverride: ['http://host.docker.internal:3000/.well-known/jwks.json'],
       algorithms: ['RS256', 'ES256'],
+      requireAudience: false,
+      authorizedParties: ['http://localhost:5173', 'https://app.example.com'],
       allowLocalHttp: true,
       allowInsecureHttpHosts: ['host.docker.internal']
     });
@@ -180,5 +184,65 @@ describe('AUTH_MODE=self-hosted', () => {
     const failure = await initializeVerifier().catch((error: unknown) => error);
     expect(failure).toMatchObject({ code: 'AUTH_CONFIGURATION' });
     expect((failure as Error).message).toContain('issuer');
+  });
+});
+
+describe('AUTH_MODE=self-hosted without an audience (Clerk session tokens)', () => {
+  const jwksUri = 'https://issuer.example.com/.well-known/jwks.json';
+
+  async function setup(env: Record<string, string>) {
+    const { privateKey, publicKey } = await generateKeyPair('RS256');
+    const jwks = { keys: [{ ...(await exportJWK(publicKey)), kid: 'k1', alg: 'RS256' }] };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(jwks), {
+      headers: { 'content-type': 'application/json' }
+    })));
+    vi.stubEnv('AUTH_MODE', 'self-hosted');
+    vi.stubEnv('AUTH_ISSUER', 'https://issuer.example.com');
+    vi.stubEnv('AUTH_JWKS_URI', jwksUri);
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+    return ({ azp, aud }: { azp?: string; aud?: string }) => {
+      const jwt = new SignJWT(azp ? { azp } : {}).setProtectedHeader({ alg: 'RS256', kid: 'k1' })
+        .setSubject('user-1').setIssuer('https://issuer.example.com').setExpirationTime('5m');
+      if (aud) jwt.setAudience(aud);
+      return jwt.sign(privateKey);
+    };
+  }
+
+  it('accepts tokens with no aud from an allowed azp, and rejects any other azp', async () => {
+    const mint = await setup({
+      AUTH_REQUIRE_AUDIENCE: 'false',
+      AUTH_AUTHORIZED_PARTIES: 'http://localhost:5173,https://app.example.com'
+    });
+    const { initializeVerifier, verifier } = await import('./src/auth/verifier.js');
+    await initializeVerifier();
+    await expect(verifier.verify(await mint({ azp: 'https://app.example.com' })))
+      .resolves.toMatchObject({ sub: 'user-1' });
+    await expect(verifier.verify(await mint({ azp: 'https://evil.example.com' })))
+      .rejects.toMatchObject({ code: 'INVALID_TOKEN' });
+    await expect(verifier.verify(await mint({})))
+      .rejects.toMatchObject({ code: 'INVALID_TOKEN' });
+  });
+
+  it('refuses to drop the audience check without an azp allowlist', async () => {
+    await setup({ AUTH_REQUIRE_AUDIENCE: 'false' });
+    const { initializeVerifier } = await import('./src/auth/verifier.js');
+    const failure = await initializeVerifier().catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: 'AUTH_CONFIGURATION' });
+    expect((failure as Error).message).toContain('authorizedParties');
+  });
+
+  it('still requires aud and checks azp when both are configured', async () => {
+    const mint = await setup({
+      AUTH_AUDIENCE: 'powersync-app',
+      AUTH_AUTHORIZED_PARTIES: 'https://app.example.com'
+    });
+    const { initializeVerifier, verifier } = await import('./src/auth/verifier.js');
+    await initializeVerifier();
+    await expect(verifier.verify(await mint({ azp: 'https://app.example.com', aud: 'powersync-app' })))
+      .resolves.toMatchObject({ sub: 'user-1' });
+    await expect(verifier.verify(await mint({ azp: 'https://app.example.com' })))
+      .rejects.toMatchObject({ code: 'INVALID_TOKEN' });
+    await expect(verifier.verify(await mint({ azp: 'https://other.example.com', aud: 'powersync-app' })))
+      .rejects.toMatchObject({ code: 'INVALID_TOKEN' });
   });
 });

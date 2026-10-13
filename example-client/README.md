@@ -62,7 +62,7 @@ instance trusts. The demo `fetchAuthToken()` returns a fixed token (`VITE_POWERS
 Both sync and writes reuse it.
 
 For a provider integration, edit the private `fetchAuthToken()` method in your copied connector.
-See [Supabase and Clerk](../docs/auth/verifiers.md). If using different tokens for sync and writes,
+See [Supabase and Clerk](../docs/auth/providers.md). If using different tokens for sync and writes,
 also adapt `fetchCredentials()`, keeping the same user ID in both tokens.
 
 The modular transport's token callback is `getAuthToken`; its timeout option is `timeoutMs`.

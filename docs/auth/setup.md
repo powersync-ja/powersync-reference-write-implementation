@@ -99,7 +99,8 @@ AUTH_JWKS_URI=https://issuer.example.com/.well-known/jwks.json
 | --- | --- |
 | `AUTH_JWKS_URI` | Required. Your provider's key endpoint (`client_auth.jwks_uri`). |
 | `AUTH_ISSUER` | Required. PowerSync never checks `iss`, so state the issuer you expect. |
-| `AUTH_AUDIENCE` | Required. The complete accepted audience list, comma-separated (`client_auth.audience`). |
+| `AUTH_AUDIENCE` | Required unless `AUTH_REQUIRE_AUDIENCE=false`. The complete accepted audience list, comma-separated (`client_auth.audience`). |
+| `AUTH_REQUIRE_AUDIENCE`, `AUTH_AUTHORIZED_PARTIES` | Optional. For tokens without `aud` (Clerk session tokens): set `AUTH_REQUIRE_AUDIENCE=false` and list the accepted `azp` origins, comma-separated. Dropping the audience requires the `azp` list; with an audience, the list adds a further check. |
 | `AUTH_JWKS_URI_OVERRIDE` | Optional. Read keys from this address instead, when the backend reaches the provider differently than PowerSync does. |
 
 The other `AUTH_*` variables for HTTP trust and algorithms apply as well. `AUTH_INSTANCE_URL`,
@@ -130,8 +131,9 @@ requires updating the file and restarting.
 
 The built-in resolver supports one issuer and one audience policy per verifier. It rejects
 symmetric keys, private keys, legacy Supabase secrets, and configurations with no supported
-verification keys. PowerSync temporary tokens are excluded. Clerk session tokens without
-`aud` need the custom integration in [the provider guide](verifiers.md).
+verification keys. PowerSync temporary tokens are excluded. Tokens without `aud`, such as Clerk
+session tokens, are supported only through `AUTH_REQUIRE_AUDIENCE=false` with `AUTH_AUTHORIZED_PARTIES`;
+see [Supabase and Clerk](providers.md).
 
 Authentication does not restrict writes. Add [authorization](authorization.md)
 using trusted identity and permissions, and configure sync access separately.

@@ -39,6 +39,8 @@ export function supplementsFromEnv(env: NodeJS.ProcessEnv = process.env): AuthSu
     jwksUri: text('AUTH_JWKS_URI'),
     jwksUriOverride: list('AUTH_JWKS_URI_OVERRIDE'),
     algorithms: list('AUTH_ALGORITHMS'),
+    requireAudience: flag('AUTH_REQUIRE_AUDIENCE'),
+    authorizedParties: list('AUTH_AUTHORIZED_PARTIES'),
     allowLocalHttp: flag('AUTH_ALLOW_LOCAL_HTTP'),
     allowInsecureHttpHosts: list('AUTH_ALLOW_INSECURE_HTTP_HOSTS')
   };
