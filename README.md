@@ -8,7 +8,7 @@ SQL Server, and reference TypeScript connectors. You supply the database, PowerS
 instance, client application, and application-specific authorization.
 
 On Supabase, you can deploy the same write API as an Edge Function that enforces your RLS
-policies instead; see [Supabase Edge Function](docs/supabase-edge.md).
+policies instead; see [Supabase Edge Function](supabase/README.md).
 
 ## Setup
 
