@@ -5,6 +5,9 @@ export commands require the [PowerSync CLI](https://docs.powersync.com/tools/cli
 
 ## PowerSync Cloud export
 
+
+The export commands require the [PowerSync CLI](https://docs.powersync.com/tools/cli).
+
 From the repository root, export directly to the path the backend expects:
 
 ```sh
@@ -12,11 +15,11 @@ powersync login
 powersync fetch config --instance-id="<instance-id>" --output=json > backend/powersync-config.json
 ```
 
+To use a different file, set `POWERSYNC_CONFIG_PATH` to its absolute host path in the root `.env`.
+
 Alternatively, run `powersync link cloud --instance-id="<instance-id>"` once, then omit the
 instance flag on later exports. If your installed CLI also requires organization or project
 IDs, pass `--org-id` and `--project-id`; use `powersync fetch config --help` to inspect its flags.
-The [export command](https://github.com/powersync-ja/powersync-cli/blob/main/cli/src/commands/fetch/config.ts)
-prints JSON when `--output=json` is supplied.
 
 Pass the complete response with its top-level `config` object. Keep it out of version control;
 it can contain database settings and secret references. This repository ignores

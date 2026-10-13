@@ -44,11 +44,10 @@ such as `localhost`. Other Docker environments may require a host-gateway config
 
 ### 2. Configure authentication
 
-The backend does not issue tokens. It accepts only tokens signed by keys this configuration
-trusts, normally the same provider your PowerSync instance trusts, so clients authenticate
-with the same provider. The default `backend/src/auth/verifier.ts` reads a PowerSync Cloud
-JSON export, resolves its authentication settings, and builds a verifier. It may need
-additional trusted settings, such as the expected issuer or audience.
+The backend accepts tokens signed by keys it trusts, normally the same provider your PowerSync instance trusts,
+so clients authenticate with the same provider for read and write.
+The default `backend/src/auth/verifier.ts` reads a PowerSync Cloud JSON export, resolves its authentication settings, and builds a verifier.
+It may need additional trusted settings, such as the expected issuer or audience.
 
 Choose an integration:
 
@@ -60,10 +59,6 @@ Choose an integration:
   YAML or detect self-hosted configuration automatically.
 - **Custom provider:** preserve the startup and request exports when replacing the verifier.
   See [Supabase and Clerk integration](docs/auth/verifiers.md).
-
-The export commands require the [PowerSync CLI](https://docs.powersync.com/tools/cli).
-Compose mounts the export read-only. To use a different file, set `POWERSYNC_CONFIG_PATH`
-to its absolute host path in the root `.env`. The file must exist before starting Compose.
 
 ### 3. Start the API
 
@@ -82,7 +77,7 @@ Copy a connector from [example-client](example-client/README.md) into your app. 
 its write API URL, PowerSync sync URL, and token retrieval, then pass it to your existing
 PowerSync database's `connect()` method. The connector implements:
 
-- `fetchCredentials()`: credentials for the PowerSync sync connection.
+- `fetchCredentials()`: credentials for the PowerSync sync connection. If your application is already reading data from PowerSync then you will have already implemented this function, we recommend that you keep your existing implementation and configure the API to trust the same issuers - see [auth setup](docs/auth/setup.md).
 - `uploadData()`: sends queued local transactions to `POST /api/data`.
 
 Use a URL reachable from the client device. `localhost` refers to that device, so another
