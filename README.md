@@ -14,6 +14,9 @@ the behavior to your own requirements, or you can modify it to suit your specifi
 
 You supply the database, PowerSync instance, client application, and application-specific authorization, and you must copy the example `uploadData` implementation to your front-end code.
 
+On Supabase, you can deploy the same write API as an Edge Function that enforces your RLS
+policies instead; see [Supabase Edge Function](supabase/README.md).
+
 ## Setup
 
 Run the commands below from the repository root. `docker compose` runs the backend;

@@ -10,7 +10,8 @@
     "format": "prettier --write .",
     "check": "tsc -b",
     "test": "vitest run",
-    "generate-types": "openapi-typescript ./powersync-reference-write-api.openapi.yaml -o src/generated/api.ts && openapi-typescript ./powersync-reference-write-api.openapi.yaml -o ../example-client/src/generated/api.d.ts"
+    "generate-types": "openapi-typescript ./powersync-reference-write-api.openapi.yaml -o src/generated/api.ts && openapi-typescript ./powersync-reference-write-api.openapi.yaml -o ../example-client/src/generated/api.d.ts",
+    "generate-edge-validator": "tsx scripts/generate-edge-validator.ts"
   },
   "dependencies": {
     "dotenv": "^16.3.1",
@@ -30,12 +31,14 @@
     "@types/node": "^22.7.5",
     "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.1",
+    "ajv": "8.17.1",
     "openapi-typescript": "^7.13.0",
     "prettier": "^3.2.4",
     "supertest": "^7.2.2",
     "tsx": "^4.21.0",
     "typescript": "^5.6.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "yaml": "2.8.1"
   },
   "packageManager": "pnpm@9.12.3+sha512.cce0f9de9c5a7c95bef944169cc5dfe8741abfb145078c0d508b868056848a87c81e626246cb60967cbd7fd29a6c062ef73ff840d96b3c86c40ac92cf4a813ee"
 }

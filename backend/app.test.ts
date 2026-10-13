@@ -5,6 +5,16 @@ import request from 'supertest';
 vi.hoisted(() => vi.stubEnv('POWERSYNC_CONFIG_PATH', '/missing-auth-config-for-app-tests.json'));
 afterAll(() => vi.unstubAllEnvs());
 
+// Accepts one known token so requests can get past authentication to request validation.
+vi.mock('./src/auth/verifier.ts', () => ({
+  verifier: {
+    async verify(token: string) {
+      if (token !== 'valid-token') throw new Error('invalid token');
+      return { sub: 'user-1', claims: {} };
+    }
+  }
+}));
+
 import app from './app.ts';
 
 /**
@@ -20,12 +30,35 @@ describe('the assembled application', () => {
   });
 
   it('rejects a request that violates the OpenAPI contract', async () => {
-    // Supply a bearer header so request validation reaches the empty batch, which violates minItems.
+    // An authenticated request reaches validation; the empty batch violates minItems.
     const response = await request(app)
       .post('/api/data')
-      .set('Authorization', 'Bearer not-a-real-token')
+      .set('Authorization', 'Bearer valid-token')
       .send({ transactions: [] });
 
     expect(response.status).toBe(400);
+  });
+
+  it('authenticates before validating the request body', async () => {
+    const invalidToken = await request(app)
+      .post('/api/data')
+      .set('Authorization', 'Bearer not-a-real-token')
+      .send({ transactions: [] });
+    const missingToken = await request(app).post('/api/data').send({ transactions: [] });
+    const malformedJson = await request(app)
+      .post('/api/data')
+      .set('Authorization', 'Bearer not-a-real-token')
+      .set('Content-Type', 'application/json')
+      .send('{not json');
+
+    expect(invalidToken.status).toBe(401);
+    expect(missingToken.status).toBe(401);
+    expect(malformedJson.status).toBe(401);
+  });
+
+  it('answers CORS preflight without a token', async () => {
+    const response = await request(app).options('/api/data');
+
+    expect(response.status).toBe(200);
   });
 });

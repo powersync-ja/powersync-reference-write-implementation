@@ -22,6 +22,10 @@ export const classifyPostgresError = (error: unknown): Error => {
   if (code.startsWith('22')) {
     return new FatalOperationError('INVALID_DATA', message);
   }
+  // insufficient_privilege: a missing grant or a row-level security policy rejected the write.
+  if (code === '42501') {
+    return new FatalOperationError('UNAUTHORIZED', message);
+  }
   if (code.startsWith('42')) {
     return new FatalOperationError('SCHEMA_MISMATCH', message);
   }
