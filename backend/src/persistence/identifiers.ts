@@ -33,7 +33,7 @@ export function assertSafeIdentifier(name: unknown, kind: 'table' | 'column'): a
 
 /**
  * Refuses an identifier that contains one of the database's quoting characters, instead of
- * escaping it. Client names are validated before a persister runs (see persister-factories.ts), so
+ * escaping it. The transaction processor validates client names before a persister runs, so
  * these characters can only come from a custom mapper.
  */
 export function assertNoQuoteCharacters(identifier: string, quoteCharacters: string[]): void {

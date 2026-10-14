@@ -5,8 +5,9 @@ caller may make. The default authorizer allows all authenticated writes.
 
 ## Authorization hook
 
-`backend/src/auth/authorizer.ts` exports an `Authorizer`, called once per transaction
-by the transaction processor (`backend/src/write/processor.ts`) before persistence:
+`backend/src/auth/authorizer.ts` exports an `Authorizer` (the interface is defined in
+`backend/src/types.ts`), called once per transaction by the transaction processor
+(`backend/src/write/processor.ts`) before persistence:
 
 ```ts
 export interface Authorizer {

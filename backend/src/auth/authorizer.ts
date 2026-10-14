@@ -1,17 +1,4 @@
-import type { CrudEntry } from '../types.ts';
-import type { AuthContext } from './types.ts';
-
-/**
- * Checks whether an authenticated caller may apply a transaction.
- * Called before persistence with the ordered CRUD operations and verified identity.
- * Existing rows are not available through this interface. Check row ownership inside
- * the persister's database transaction.
- *
- * Return false to reject the transaction with a fatal error.
- */
-export interface Authorizer {
-  authorize(crud: CrudEntry[], auth: AuthContext): boolean | Promise<boolean>;
-}
+import type { Authorizer } from '../types.ts';
 
 /**
  * Allows all authenticated writes. Replace this implementation with your application's

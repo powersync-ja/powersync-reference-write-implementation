@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertMatch } from '@std/assert';
 import { createPostgresPersister } from '../../../backend/src/persistence/postgres/postgres-persistence.ts';
 import { asAuthenticatedUser } from '../../functions/powersync-write/rls.ts';
-import { admin, batch, del, FUNCTION_URL, listRow, POOLER_URL, patch, post, postBody, put, signUp, todoRow, type TestUser } from './helpers.ts';
+import { admin, applyTestSchema, batch, del, FUNCTION_URL, listRow, POOLER_URL, patch, post, postBody, put, signUp, todoRow, type TestUser } from './helpers.ts';
 
 const id = () => crypto.randomUUID();
 let a: TestUser;
@@ -12,6 +12,7 @@ Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
   async fn(t) {
+    await applyTestSchema();
     [a, b] = await Promise.all([signUp('user-a'), signUp('user-b')]);
 
     await t.step('applies a user’s own create, update, and delete in order', async () => {

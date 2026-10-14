@@ -1,11 +1,10 @@
 import * as mongo from 'mongodb';
-import type { Persister, CrudEntry } from '../../types.ts';
+import type { AuthContext, Persister, CrudEntry } from '../../types.ts';
 import { classifyMongoError } from './mongo-errors.ts';
 import type { EntryMapper } from '../../mapping/types.ts';
 import { createMongoMapper } from '../../mapping/mongo.ts';
 import { discoverSchema, type CollectionSchema } from './mongo-schema.ts';
 import { FatalOperationError, RetryableError } from '../../errors.ts';
-import type { AuthContext } from '../../auth/types.ts';
 
 export const createMongoPersister = async (uri: string, mapper?: EntryMapper): Promise<Persister> => {
   console.debug('Using MongoDB Persister');

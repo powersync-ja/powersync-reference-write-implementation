@@ -81,6 +81,23 @@ describe('createTransactionProcessor', () => {
     ]);
   });
 
+  it('rejects unsafe client names after authorization and before creating the persister', async () => {
+    const authorize = vi.fn().mockReturnValue(true);
+    const persister = vi.fn();
+    const { process } = setup({ authorizer: { authorize }, persister, batchOnFatalError: () => 'stop' });
+    const crud = [
+      { op: 'PUT' as const, table: 'items', id: '1', op_data: { a: 1 } },
+      { op: 'PUT' as const, table: 'items', id: '2', op_data: { 'a; DROP': 1 } }
+    ];
+    const results = await process([{ transaction_id: 1, crud }], auth);
+    expect(results[0]).toMatchObject({
+      status: 'fatal_error',
+      failed_operation: { error_code: 'INVALID_DATA', operation_index: 1 }
+    });
+    expect(authorize).toHaveBeenCalledOnce();
+    expect(persister).not.toHaveBeenCalled();
+  });
+
   it('reads the batch policy once per batch', async () => {
     const batchOnFatalError = vi.fn().mockReturnValue('skip');
     const { process } = setup({ batchOnFatalError });

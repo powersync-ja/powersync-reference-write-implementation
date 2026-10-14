@@ -1,5 +1,5 @@
 import { assertEquals } from '@std/assert';
-import { admin, FUNCTION_URL, listRow, signUp } from './helpers.ts';
+import { admin, applyTestSchema, FUNCTION_URL, listRow, signUp } from './helpers.ts';
 
 /**
  * Runs the unchanged single-file example connector against the function. Only its BACKEND_URL
@@ -10,6 +10,7 @@ Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
   async fn() {
+    await applyTestSchema();
     const user = await signUp('connector');
     const source = await Deno.readTextFile(new URL('../../../example-client/src/PowersyncConnector.singlefile.ts', import.meta.url));
     const configured = source

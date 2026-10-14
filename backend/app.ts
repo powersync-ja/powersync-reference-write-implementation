@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as OpenApiValidator from 'express-openapi-validator';
-import { apiRouter } from './src/api/index.ts';
+import { postTransactionBatch } from './src/api/data.ts';
 import { requireAuth } from './src/auth/middleware.ts';
 import { verifier } from './src/auth/verifier.ts';
 import logRequest from './src/middleware/logger.ts';
@@ -42,7 +42,7 @@ app.get('/', (_req: Request, res: Response) => {
   res.status(200).send({ message: 'backend' });
 });
 
-app.use('/api', apiRouter);
+app.post('/api/data', postTransactionBatch);
 
 const errorHandler = (err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
   res.status(err.status || 500).send({ message: err.message });

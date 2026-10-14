@@ -18,9 +18,11 @@ The factories are configured in `backend/src/persistence/persister-factories.ts`
 
 ## Identifier validation
 
-Before the mapper runs, the wrappers in `backend/src/persistence/persister-factories.ts` check the client-supplied table name and each `op_data`
-key against `^[A-Za-z_][A-Za-z0-9_]*$` (at most 63 characters; see
-`backend/src/persistence/identifiers.ts`). A name that fails, such as `my-table`, `public.todos`
+Before any persister or mapper runs, the transaction processor
+(`backend/src/write/processor.ts`) checks the client-supplied table name and each `op_data` key
+against `^[A-Za-z_][A-Za-z0-9_]*$` (at most 63 characters; see
+`backend/src/persistence/identifiers.ts`). This applies to every backend, including the
+Supabase Edge Function and any persister you install. A name that fails, such as `my-table`, `public.todos`
 or `$where`, rejects the transaction with an `INVALID_DATA` fatal error and the operation index.
 Rename the client table or column, or accept the plain name and map it to the real one in a
 custom mapper. Names a mapper returns are not subject to this check, so a mapper can target
@@ -120,13 +122,13 @@ table. Skipped operations are not an error.
 ### Installing it
 
 Factories take `(uri, mapper?)` and are stored in a record, so wrap the one you want. Edit
-`unvalidatedFactories` in `backend/src/persistence/persister-factories.ts`. The exported
-`factories` wraps every entry with identifier validation, including yours:
+`factories` in `backend/src/persistence/persister-factories.ts`. Identifier validation still
+applies, because the transaction processor runs it before any factory's persister:
 
 ```ts
 import { renamingMapper } from '../mapping/renames.ts';
 
-const unvalidatedFactories: Record<string, PersisterFactory> = {
+export const factories: Record<string, PersisterFactory> = {
   mongodb: createMongoPersister,
   postgres: createPostgresPersister,
   mysql: (uri) => createMySQLPersister(uri, renamingMapper),

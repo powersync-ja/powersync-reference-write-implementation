@@ -1,5 +1,5 @@
 import type PG from 'pg';
-import type { AuthContext } from '../../../backend/src/auth/types.ts';
+import type { AuthContext } from '../../../backend/src/types.ts';
 
 /**
  * Applies Supabase RLS for the verified caller inside the current database transaction.

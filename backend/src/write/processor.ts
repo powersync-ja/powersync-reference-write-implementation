@@ -1,8 +1,7 @@
 import { FatalOperationError, RetryableError } from '../errors.ts';
 import { deliverDeadLetter, type FatalErrorContext, type FatalErrorHandler } from './dead-letter.ts';
-import type { Authorizer } from '../auth/authorizer.ts';
-import type { AuthContext } from '../auth/types.ts';
-import type { OpBody, Persister, TransactionResult } from '../types.ts';
+import { assertSafeTransaction } from '../persistence/identifiers.ts';
+import type { AuthContext, Authorizer, OpBody, Persister, TransactionResult } from '../types.ts';
 
 export type BatchOnFatalError = 'stop' | 'skip';
 export type UploadedTransaction = FatalErrorContext['transaction'];
@@ -37,6 +36,9 @@ export function createTransactionProcessor(options: TransactionProcessorOptions)
       if (!allowed) {
         throw new FatalOperationError('UNAUTHORIZED', 'Not authorized to apply this transaction');
       }
+      // Rejects unsafe client table and column names before any database work, whichever
+      // persister runs. See docs/schema-mapping.md#identifier-validation.
+      assertSafeTransaction(transaction.crud);
 
       const { updateBatch } = await options.persister();
       await updateBatch(transaction.crud, auth);

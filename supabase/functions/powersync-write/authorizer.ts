@@ -1,4 +1,4 @@
-import type { Authorizer } from '../../../backend/src/auth/authorizer.ts';
+import type { Authorizer } from '../../../backend/src/types.ts';
 
 /**
  * Application checks that run before each transaction is written. Row-level security and

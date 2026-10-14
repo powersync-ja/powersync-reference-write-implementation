@@ -92,6 +92,7 @@ import { createMySQLPersister } from './src/persistence/mysql/mysql-persistence.
 import { createMSSQLPersister } from './src/persistence/mssql/mssql-persistence.ts';
 import { createMongoPersister } from './src/persistence/mongo/mongo-persistence.ts';
 import { factories } from './src/persistence/persister-factories.ts';
+import { createTransactionProcessor } from './src/write/processor.ts';
 import type { EntryMapper } from './src/mapping/types.ts';
 import { defaultMapper } from './src/mapping/default.ts';
 
@@ -272,10 +273,14 @@ describe.each(['postgres', 'mysql', 'mssql', 'mongodb'])('%s identifier validati
     ['bracket in column', { op: 'PATCH' as const, id: '1', table: 'items', op_data: { 'a]; DROP TABLE x--': 1 } }],
     ['operator column', { op: 'PATCH' as const, id: '1', table: 'items', op_data: { $where: 1 } }]
   ])('rejects a hostile %s before any database work', async (_label, hostile) => {
-    const persister = await factories[name]('postgres://user:pass@localhost:5432/db');
-    const error = await persister.updateBatch([batch[0], hostile], auth).catch((e) => e);
-    expect(error).toBeInstanceOf(FatalOperationError);
-    expect(error).toMatchObject({ errorCode: 'INVALID_DATA', operationIndex: 1 });
+    const process = createTransactionProcessor({
+      persister: () => factories[name]('postgres://user:pass@localhost:5432/db'),
+      authorizer: { authorize: () => true },
+      fatalErrorHandler: { requiresClientHandling: () => true, onDeadLetter: () => {} },
+      batchOnFatalError: () => 'stop'
+    });
+    const [result] = await process([{ transaction_id: 1, crud: [batch[0], hostile] }], auth);
+    expect(result).toMatchObject({ status: 'fatal_error', failed_operation: { error_code: 'INVALID_DATA', operation_index: 1 } });
     // The whole transaction is refused up front: not even the valid first operation runs.
     expect(db.operation).not.toHaveBeenCalled();
     expect(db.begin).not.toHaveBeenCalled();

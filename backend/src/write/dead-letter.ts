@@ -1,4 +1,4 @@
-import type { AuthContext } from '../auth/types.ts';
+import type { AuthContext } from '../types.ts';
 import type { components } from '../generated/api.ts';
 import type { FatalOperationError, JsonValue } from '../errors.ts';
 

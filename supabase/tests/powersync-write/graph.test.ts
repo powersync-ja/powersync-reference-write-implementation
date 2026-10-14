@@ -18,8 +18,6 @@ Deno.test('function import graph contains only the edge modules', async () => {
     .map((m) => relative(REPO, fromFileUrl(m.specifier)))
     .sort();
   assertEquals(local, [
-    'backend/src/auth/authorizer.ts',
-    'backend/src/auth/types.ts',
     'backend/src/errors.ts',
     'backend/src/generated/api.ts',
     'backend/src/generated/transaction-batch-validator.ts',

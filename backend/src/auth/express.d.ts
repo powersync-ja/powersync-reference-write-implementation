@@ -1,4 +1,4 @@
-import type { AuthContext } from './types.ts';
+import type { AuthContext } from '../types.ts';
 
 // Node-only: kept out of types.ts so runtime-independent code can import it without Express.
 declare global {

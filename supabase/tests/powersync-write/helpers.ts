@@ -15,6 +15,11 @@ export const POOLER_URL = 'postgresql://postgres.pooler-dev:postgres@127.0.0.1:5
 /** Administrative connection for checking persisted state. Never used for writes under test. */
 export const admin = new pg.Pool({ connectionString: 'postgresql://postgres:postgres@127.0.0.1:54322/postgres', max: 2 });
 
+let schema: Promise<unknown> | undefined;
+/** Creates the lists and todos test tables (schema.sql) if they are missing. */
+export const applyTestSchema = () =>
+  (schema ??= Deno.readTextFile(new URL('./schema.sql', import.meta.url)).then((sql) => admin.query(sql)));
+
 async function run(command: string, args: string[]): Promise<string> {
   const output = await new Deno.Command(command, { args, stdout: 'piped', stderr: 'piped' }).output();
   if (!output.success) throw new Error(`${command} ${args.join(' ')} failed: ${new TextDecoder().decode(output.stderr)}`);

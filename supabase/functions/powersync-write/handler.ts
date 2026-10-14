@@ -1,8 +1,7 @@
-import { assertSafeTransaction } from '../../../backend/src/persistence/identifiers.ts';
 import { createPostgresPersister } from '../../../backend/src/persistence/postgres/postgres-persistence.ts';
 import { createTransactionProcessor, type TransactionProcessor } from '../../../backend/src/write/processor.ts';
 import { validateBatchBody } from '../../../backend/src/write/validate-batch.ts';
-import type { AuthContext } from '../../../backend/src/auth/types.ts';
+import type { AuthContext } from '../../../backend/src/types.ts';
 import { authorizer } from './authorizer.ts';
 import { batchOnFatalError, pool, readConfig } from './config.ts';
 import { fatalErrorHandler } from './fatal-error-handler.ts';
@@ -21,16 +20,8 @@ const getProcessor = (): TransactionProcessor => {
       pool,
       initializeTransaction: asAuthenticatedUser
     });
-    // Rejects unsafe client table and column names before any database work, like the Express
-    // backend's persister factories. See docs/schema-mapping.md#identifier-validation.
-    const validated = {
-      updateBatch: async (...args: Parameters<typeof persister.updateBatch>) => {
-        assertSafeTransaction(args[0]);
-        return persister.updateBatch(...args);
-      }
-    };
     processor = createTransactionProcessor({
-      persister: () => validated,
+      persister: () => persister,
       authorizer,
       fatalErrorHandler,
       batchOnFatalError: () => batchOnFatalError,
@@ -41,13 +32,14 @@ const getProcessor = (): TransactionProcessor => {
 };
 
 /**
- * Checks the claims this endpoint requires beyond signature and audience, which the
- * auth middleware has verified. Returns the identity for an ordinary signed-in user, or null.
+ * Checks the claims this endpoint requires beyond what the auth middleware verifies (signature,
+ * audience, and an exp that has not passed). The middleware does not require exp, a subject
+ * that is non-empty, or a role. Returns the identity for an ordinary signed-in user, or null.
  */
 export function userIdentity(claims: Record<string, unknown>): AuthContext | null {
   const { sub, exp, role } = claims;
   if (typeof sub !== 'string' || sub === '') return null;
-  if (typeof exp !== 'number' || exp * 1000 <= Date.now()) return null;
+  if (typeof exp !== 'number') return null;
   if (role !== 'authenticated') return null;
   return { sub, claims };
 }

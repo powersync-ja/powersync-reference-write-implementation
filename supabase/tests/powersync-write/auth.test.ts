@@ -3,13 +3,14 @@ import { pipeline } from '@supabase/middleware';
 import { withRequiredClaims } from '@supabase/server/middleware/required-claims';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { userIdentity } from '../../functions/powersync-write/handler.ts';
-import { admin, batch, listRow, localStatus, mintToken, post, put, signUp } from './helpers.ts';
+import { admin, applyTestSchema, batch, listRow, localStatus, mintToken, post, put, signUp } from './helpers.ts';
 
 Deno.test({
   name: 'rejects credentials that are not a valid user token for this project',
   sanitizeOps: false,
   sanitizeResources: false,
   async fn(t) {
+    await applyTestSchema();
     const user = await signUp('auth');
     const { PUBLISHABLE_KEY, ANON_KEY, SERVICE_ROLE_KEY } = await localStatus();
     const [header, payload] = user.token.split('.');
@@ -81,13 +82,12 @@ Deno.test('verifies RS256 project keys with the same audience and role checks', 
   assertEquals(await call(await sign({ role: 'service_role' })), 401);
 });
 
-Deno.test('userIdentity requires a subject, a future expiry, and the authenticated role', () => {
+Deno.test('userIdentity requires a subject, an expiry, and the authenticated role', () => {
   const exp = Math.floor(Date.now() / 1000) + 60;
   assertEquals(userIdentity({ sub: 'u', exp, role: 'authenticated' })?.sub, 'u');
   assertEquals(userIdentity({ sub: '', exp, role: 'authenticated' }), null);
   assertEquals(userIdentity({ exp, role: 'authenticated' }), null);
   assertEquals(userIdentity({ sub: 'u', role: 'authenticated' }), null);
-  assertEquals(userIdentity({ sub: 'u', exp: exp - 120, role: 'authenticated' }), null);
   assertEquals(userIdentity({ sub: 'u', exp, role: 'anon' }), null);
   assertEquals(userIdentity({ sub: 'u', exp }), null);
 });
