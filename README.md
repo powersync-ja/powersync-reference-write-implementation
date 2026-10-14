@@ -57,6 +57,8 @@ Choose an integration:
 - **Any other provider (Clerk, Auth0, Supabase):** set `AUTH_MODE=env` with your issuer,
   audience and JWKS URL, no file needed. See [auth setup](docs/auth/setup.md#environment-variables-only)
   and the [Supabase and Clerk guide](docs/auth/providers.md).
+- **Trying it out with no provider:** use
+  [PowerSync development tokens](docs/auth/development-tokens.md).
 
 ### 3. Start the API
 
