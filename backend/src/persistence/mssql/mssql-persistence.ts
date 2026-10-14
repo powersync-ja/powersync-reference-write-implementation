@@ -1,12 +1,12 @@
-import { FatalOperationError } from '../../errors.js';
-import { assertNoQuoteCharacters } from '../identifiers.js';
+import { FatalOperationError } from '../../errors.ts';
+import { assertNoQuoteCharacters } from '../identifiers.ts';
 import { URL } from 'url';
 import sql from 'mssql';
-import type { Persister, CrudEntry } from '../../types.js';
-import { classifyMSSQLError } from './mssql-errors.js';
-import type { EntryMapper } from '../../mapping/types.js';
-import { defaultMapper } from '../../mapping/default.js';
-import type { AuthContext } from '../../auth/types.js';
+import type { Persister, CrudEntry } from '../../types.ts';
+import { classifyMSSQLError } from './mssql-errors.ts';
+import type { EntryMapper } from '../../mapping/types.ts';
+import { defaultMapper } from '../../mapping/default.ts';
+import type { AuthContext } from '../../auth/types.ts';
 
 function escapeIdentifier(identifier: string): string {
   assertNoQuoteCharacters(identifier, ['[', ']']);

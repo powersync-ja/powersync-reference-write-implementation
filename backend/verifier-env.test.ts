@@ -3,8 +3,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
-import { authModeFromEnv, supplementsFromEnv } from './src/auth/verifier/env.js';
-import { AuthConfigurationError } from './src/auth/verifier/index.js';
+import { authModeFromEnv, supplementsFromEnv } from './src/auth/verifier/env.ts';
+import { AuthConfigurationError } from './src/auth/verifier/index.ts';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -87,7 +87,7 @@ describe('verifier configured only through the environment', () => {
     await withGenericConfig(async (sign) => {
       vi.stubEnv('AUTH_ISSUER', 'https://issuer.example.com');
       vi.stubEnv('AUTH_AUDIENCE', 'https://instance.example.com');
-      const { initializeVerifier, verifier } = await import('./src/auth/verifier.js');
+      const { initializeVerifier, verifier } = await import('./src/auth/verifier.ts');
       await initializeVerifier();
       await expect(verifier.verify(await sign({ iss: 'https://issuer.example.com', aud: 'https://instance.example.com' })))
         .resolves.toMatchObject({ sub: 'user-1' });
@@ -100,7 +100,7 @@ describe('verifier configured only through the environment', () => {
 
   it('refuses to start without them and points at the environment, not at the source file', async () => {
     await withGenericConfig(async () => {
-      const { initializeVerifier } = await import('./src/auth/verifier.js');
+      const { initializeVerifier } = await import('./src/auth/verifier.ts');
       const failure = await initializeVerifier().catch((error: unknown) => error);
       // Not toBeInstanceOf: resetModules gives the dynamically imported verifier its own copy of the class.
       expect(failure).toMatchObject({ code: 'AUTH_CONFIGURATION' });
@@ -147,7 +147,7 @@ describe('AUTH_MODE=env', () => {
       AUTH_AUDIENCE: 'powersync-app',
       AUTH_JWKS_URI: jwksUri
     });
-    const { initializeVerifier, verifier } = await import('./src/auth/verifier.js');
+    const { initializeVerifier, verifier } = await import('./src/auth/verifier.ts');
     await initializeVerifier();
     await expect(verifier.verify(await mint({ iss: 'https://issuer.example.com', aud: 'powersync-app' })))
       .resolves.toMatchObject({ sub: 'user-1' });
@@ -164,7 +164,7 @@ describe('AUTH_MODE=env', () => {
       AUTH_JWKS_URI: jwksUri,
       AUTH_JWKS_URI_OVERRIDE: 'https://keys.internal.example.com/jwks.json'
     });
-    const { initializeVerifier, verifier } = await import('./src/auth/verifier.js');
+    const { initializeVerifier, verifier } = await import('./src/auth/verifier.ts');
     await initializeVerifier();
     await verifier.verify(await mint({ iss: 'https://issuer.example.com', aud: 'powersync-app' }));
     expect(vi.mocked(fetch).mock.calls[0]?.[0].toString()).toBe('https://keys.internal.example.com/jwks.json');
@@ -172,7 +172,7 @@ describe('AUTH_MODE=env', () => {
 
   it('refuses to start without a key endpoint, naming AUTH_JWKS_URI', async () => {
     await sign({ AUTH_ISSUER: 'https://issuer.example.com', AUTH_AUDIENCE: 'powersync-app' });
-    const { initializeVerifier } = await import('./src/auth/verifier.js');
+    const { initializeVerifier } = await import('./src/auth/verifier.ts');
     const failure = await initializeVerifier().catch((error: unknown) => error);
     expect(failure).toMatchObject({ code: 'AUTH_CONFIGURATION' });
     expect((failure as Error).message).toContain('AUTH_JWKS_URI');
@@ -180,7 +180,7 @@ describe('AUTH_MODE=env', () => {
 
   it('refuses to start without an issuer', async () => {
     await sign({ AUTH_AUDIENCE: 'powersync-app', AUTH_JWKS_URI: jwksUri });
-    const { initializeVerifier } = await import('./src/auth/verifier.js');
+    const { initializeVerifier } = await import('./src/auth/verifier.ts');
     const failure = await initializeVerifier().catch((error: unknown) => error);
     expect(failure).toMatchObject({ code: 'AUTH_CONFIGURATION' });
     expect((failure as Error).message).toContain('issuer');
@@ -213,7 +213,7 @@ describe('AUTH_MODE=env without an audience (Clerk session tokens)', () => {
       AUTH_REQUIRE_AUDIENCE: 'false',
       AUTH_AUTHORIZED_PARTIES: 'http://localhost:5173,https://app.example.com'
     });
-    const { initializeVerifier, verifier } = await import('./src/auth/verifier.js');
+    const { initializeVerifier, verifier } = await import('./src/auth/verifier.ts');
     await initializeVerifier();
     await expect(verifier.verify(await mint({ azp: 'https://app.example.com' })))
       .resolves.toMatchObject({ sub: 'user-1' });
@@ -225,7 +225,7 @@ describe('AUTH_MODE=env without an audience (Clerk session tokens)', () => {
 
   it('refuses to drop the audience check without an azp allowlist', async () => {
     await setup({ AUTH_REQUIRE_AUDIENCE: 'false' });
-    const { initializeVerifier } = await import('./src/auth/verifier.js');
+    const { initializeVerifier } = await import('./src/auth/verifier.ts');
     const failure = await initializeVerifier().catch((error: unknown) => error);
     expect(failure).toMatchObject({ code: 'AUTH_CONFIGURATION' });
     expect((failure as Error).message).toContain('authorizedParties');
@@ -236,7 +236,7 @@ describe('AUTH_MODE=env without an audience (Clerk session tokens)', () => {
       AUTH_AUDIENCE: 'powersync-app',
       AUTH_AUTHORIZED_PARTIES: 'https://app.example.com'
     });
-    const { initializeVerifier, verifier } = await import('./src/auth/verifier.js');
+    const { initializeVerifier, verifier } = await import('./src/auth/verifier.ts');
     await initializeVerifier();
     await expect(verifier.verify(await mint({ azp: 'https://app.example.com', aud: 'powersync-app' })))
       .resolves.toMatchObject({ sub: 'user-1' });
@@ -266,7 +266,7 @@ describe('AUTH_MODE=file with a self-hosted service config', () => {
   it('verifies against inline keys, which an env-only setup cannot express', async () => {
     await withConfigFile((jwk: unknown) => ({ client_auth: { jwks: { keys: [jwk] }, audience: ['powersync-app'] } }), async (privateKey) => {
       vi.stubEnv('AUTH_ISSUER', 'https://issuer.example.com');
-      const { initializeVerifier, verifier } = await import('./src/auth/verifier.js');
+      const { initializeVerifier, verifier } = await import('./src/auth/verifier.ts');
       await initializeVerifier();
       const token = await new SignJWT({}).setProtectedHeader({ alg: 'RS256', kid: 'k1' }).setSubject('user-1')
         .setIssuer('https://issuer.example.com').setAudience('powersync-app').setExpirationTime('5m').sign(privateKey);
@@ -276,7 +276,7 @@ describe('AUTH_MODE=file with a self-hosted service config', () => {
 
   it('rejects a file that is neither a Cloud export nor a service config', async () => {
     await withConfigFile({ something: 'else' }, async () => {
-      const { initializeVerifier } = await import('./src/auth/verifier.js');
+      const { initializeVerifier } = await import('./src/auth/verifier.ts');
       const failure = await initializeVerifier().catch((error: unknown) => error);
       expect(failure).toMatchObject({ code: 'AUTH_CONFIGURATION' });
       expect((failure as Error).message).toContain('client_auth');

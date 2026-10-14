@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { collectionSchemaFromJsonSchema } from './src/persistence/mongo/mongo-schema.js';
-import { createMongoMapper } from './src/mapping/mongo.js';
-import { FatalOperationError } from './src/errors.js';
-import type { CrudEntry } from './src/types.js';
+import { collectionSchemaFromJsonSchema } from './src/persistence/mongo/mongo-schema.ts';
+import { createMongoMapper } from './src/mapping/mongo.ts';
+import { FatalOperationError } from './src/errors.ts';
+import type { CrudEntry } from './src/types.ts';
 
 const todos = collectionSchemaFromJsonSchema({
   bsonType: 'object',

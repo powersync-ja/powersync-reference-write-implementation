@@ -86,7 +86,7 @@ every call, which would repeat for every operation even though your mapper does 
 
 ```ts
 // backend/src/mapping/renames.ts
-import type { EntryMapper } from './types.js';
+import type { EntryMapper } from './types.ts';
 
 // Client table -> source table, and per-table client column -> source column.
 const TABLES: Record<string, { table: string; columns: Record<string, string> }> = {
@@ -124,7 +124,7 @@ Factories take `(uri, mapper?)` and are stored in a record, so wrap the one you 
 `factories` wraps every entry with identifier validation, including yours:
 
 ```ts
-import { renamingMapper } from '../mapping/renames.js';
+import { renamingMapper } from '../mapping/renames.ts';
 
 const unvalidatedFactories: Record<string, PersisterFactory> = {
   mongodb: createMongoPersister,

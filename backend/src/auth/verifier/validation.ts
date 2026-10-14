@@ -1,5 +1,5 @@
 import type { JWK } from 'jose';
-import { AuthConfigurationError } from './types.js';
+import { AuthConfigurationError } from './types.ts';
 
 export const ASYMMETRIC_ALGORITHMS = [
   'RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512',

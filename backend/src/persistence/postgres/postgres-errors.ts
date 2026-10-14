@@ -1,4 +1,4 @@
-import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.js';
+import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.ts';
 
 const POSTGRES_CODES: Record<string, ErrorCode> = {
   '23502': 'NOT_NULL_VIOLATION',

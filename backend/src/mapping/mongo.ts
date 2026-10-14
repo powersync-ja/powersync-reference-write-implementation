@@ -1,7 +1,7 @@
 import * as z from 'zod';
-import { FatalOperationError } from '../errors.js';
-import type { CollectionSchema } from '../persistence/mongo/mongo-schema.js';
-import type { EntryMapper } from './types.js';
+import { FatalOperationError } from '../errors.ts';
+import type { CollectionSchema } from '../persistence/mongo/mongo-schema.ts';
+import type { EntryMapper } from './types.ts';
 
 /**
  * Validates and converts fields using collection schemas discovered at startup. Invalid data is

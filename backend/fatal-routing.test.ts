@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
-import { FatalOperationError, RetryableError } from './src/errors.js';
+import { FatalOperationError, RetryableError } from './src/errors.ts';
 
 const mocks = vi.hoisted(() => ({ updateBatch: vi.fn(), authorize: vi.fn(), verify: vi.fn() }));
-vi.mock('./src/persistence/persister.js', () => ({ getPersister: async () => ({ updateBatch: mocks.updateBatch }) }));
-vi.mock('./src/auth/authorizer.js', () => ({ authorizer: { authorize: mocks.authorize } }));
-vi.mock('./src/auth/verifier.js', () => ({ verifier: { verify: mocks.verify } }));
-import app from './app.js';
-import config from './config.js';
-import { fatalErrorHandler } from './src/fatal-error-handler.js';
+vi.mock('./src/persistence/persister.ts', () => ({ getPersister: async () => ({ updateBatch: mocks.updateBatch }) }));
+vi.mock('./src/auth/authorizer.ts', () => ({ authorizer: { authorize: mocks.authorize } }));
+vi.mock('./src/auth/verifier.ts', () => ({ verifier: { verify: mocks.verify } }));
+import app from './app.ts';
+import config from './config.ts';
+import { fatalErrorHandler } from './src/fatal-error-handler.ts';
 
 const transactions = [1, 2, 3].map((id) => ({
   transaction_id: id,

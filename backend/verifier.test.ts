@@ -26,7 +26,7 @@ it('shares initialized keys and verifies tokens after the config file is removed
     vi.stubEnv('POWERSYNC_CONFIG_PATH', configPath);
     const fetch = vi.fn(() => { throw new Error('Tests must not fetch remote keys'); });
     vi.stubGlobal('fetch', fetch);
-    const { initializeVerifier, verifier } = await import('./src/auth/verifier.js');
+    const { initializeVerifier, verifier } = await import('./src/auth/verifier.ts');
     const initializing = initializeVerifier();
     expect(initializeVerifier()).toBe(initializing);
     await initializing;

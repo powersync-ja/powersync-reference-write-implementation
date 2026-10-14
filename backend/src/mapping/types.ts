@@ -1,4 +1,4 @@
-import type { CrudEntry } from '../types.js';
+import type { CrudEntry } from '../types.ts';
 
 export interface MappedEntry {
   table: string;

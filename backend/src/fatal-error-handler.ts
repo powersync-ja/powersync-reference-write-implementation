@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import type { AuthContext } from './auth/types.js';
-import type { components } from './generated/api.js';
-import type { FatalOperationError, JsonValue } from './errors.js';
+import type { AuthContext } from './auth/types.ts';
+import type { components } from './generated/api.ts';
+import type { FatalOperationError, JsonValue } from './errors.ts';
 
 export interface FatalErrorHandler {
   requiresClientHandling(error: FatalOperationError, context: FatalErrorContext): boolean | Promise<boolean>;

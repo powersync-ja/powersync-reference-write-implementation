@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { ConfigurationError } from './src/errors.js';
+import { ConfigurationError } from './src/errors.ts';
 
 const batchOnFatalError = process.env.BATCH_ON_FATAL_ERROR ?? 'stop';
 

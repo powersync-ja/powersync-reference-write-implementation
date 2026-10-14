@@ -5,7 +5,7 @@ import request from 'supertest';
 vi.hoisted(() => vi.stubEnv('POWERSYNC_CONFIG_PATH', '/missing-auth-config-for-app-tests.json'));
 afterAll(() => vi.unstubAllEnvs());
 
-import app from './app.js';
+import app from './app.ts';
 
 /**
  * Regression tests for OpenAPI contract loading over HTTP.

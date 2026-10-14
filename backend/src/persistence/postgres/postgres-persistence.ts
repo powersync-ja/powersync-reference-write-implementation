@@ -1,11 +1,11 @@
-import { FatalOperationError } from '../../errors.js';
-import { assertNoQuoteCharacters } from '../identifiers.js';
+import { FatalOperationError } from '../../errors.ts';
+import { assertNoQuoteCharacters } from '../identifiers.ts';
 import PG from 'pg';
-import type { Persister, CrudEntry } from '../../types.js';
-import { classifyPostgresError } from './postgres-errors.js';
-import type { EntryMapper } from '../../mapping/types.js';
-import { defaultMapper } from '../../mapping/default.js';
-import type { AuthContext } from '../../auth/types.js';
+import type { Persister, CrudEntry } from '../../types.ts';
+import { classifyPostgresError } from './postgres-errors.ts';
+import type { EntryMapper } from '../../mapping/types.ts';
+import { defaultMapper } from '../../mapping/default.ts';
+import type { AuthContext } from '../../auth/types.ts';
 
 const { Pool } = PG;
 
