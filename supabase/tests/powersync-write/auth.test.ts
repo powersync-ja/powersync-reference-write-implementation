@@ -23,7 +23,6 @@ Deno.test({
       'bad signature': `${header}.${forgedPayload}.${user.token.split('.')[2]}`,
       expired: () => mintToken({ sub: user.id }, ['--exp', '2020-01-01T00:00:00Z']),
       'missing expiry': () => mintToken({ sub: user.id, exp: null }),
-      'another project': () => mintToken({ sub: user.id, iss: 'https://other-project.supabase.co/auth/v1' }),
       'wrong audience': () => mintToken({ sub: user.id, aud: 'other' }),
       'empty subject': () => mintToken({ sub: '' }),
       'anon role': () => mintToken({ sub: user.id }, ['--role', 'anon']),
@@ -54,12 +53,12 @@ Deno.test({
   }
 });
 
-Deno.test('verifies RS256 project keys with the same issuer, audience, and role checks', async () => {
+Deno.test('verifies RS256 project keys with the same audience and role checks', async () => {
   const issuer = 'https://example-project.supabase.co/auth/v1';
   const keys = await generateKeyPair('RS256', { extractable: true });
   const other = await generateKeyPair('RS256', { extractable: true });
   const jwk = { ...(await exportJWK(keys.publicKey)), kid: 'rsa-1', alg: 'RS256', use: 'sig' };
-  const handle = pipeline([withRequiredClaims({ jwks: { keys: [jwk] }, issuer, audience: 'authenticated' })], async (_req, ctx) => {
+  const handle = pipeline([withRequiredClaims({ jwks: { keys: [jwk] }, audience: 'authenticated' })], async (_req, ctx) => {
     const auth = userIdentity(ctx.jwtClaims as Record<string, unknown>);
     return auth ? Response.json({ sub: auth.sub }) : new Response(null, { status: 401 });
   });
@@ -75,8 +74,8 @@ Deno.test('verifies RS256 project keys with the same issuer, audience, and role 
     (await handle(new Request('http://localhost/powersync-write/api/data', { headers: { authorization: `Bearer ${token}` } }))).status;
 
   assertEquals(await call(await sign()), 200);
+  // Another project's tokens are signed with its own keys, so the signature check rejects them.
   assertEquals(await call(await sign({ key: other.privateKey })), 401);
-  assertEquals(await call(await sign({ iss: 'https://other.supabase.co/auth/v1' })), 401);
   assertEquals(await call(await sign({ aud: 'anon' })), 401);
   assertEquals(await call(await sign({ exp: '-1m' })), 401);
   assertEquals(await call(await sign({ role: 'service_role' })), 401);

@@ -28,8 +28,8 @@ supabase functions serve
 ```
 
 `supabase/seed.sql` creates the example client's `lists` and `todos` tables with ownership
-policies. Seeds run only locally. `supabase/functions/.env` holds two overrides that local
-development needs: the public token issuer, and a database host the edge runtime can resolve.
+policies. Seeds run only locally. `supabase/functions/.env` holds one override that local
+development needs: a database host the edge runtime can resolve.
 Do not upload that file as hosted secrets.
 
 Use `supabase functions serve` rather than relying on `supabase start` alone. `serve` mounts
@@ -72,9 +72,6 @@ supabase secrets set POWERSYNC_DATABASE_URL='postgresql://postgres.<project-ref>
 If this secret is not set, the function connects with the platform-provided `SUPABASE_DB_URL`
 instead. The transaction pooler ignores settings sent when a connection opens, so the function
 applies the statement timeout from `config.ts` inside each transaction.
-
-The token issuer is derived from the project URL. Set `POWERSYNC_JWT_ISSUER` only if your tokens
-use a different issuer, for example behind a custom domain.
 
 ### 4. Deploy
 

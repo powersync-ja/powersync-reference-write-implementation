@@ -41,7 +41,7 @@ const getProcessor = (): TransactionProcessor => {
 };
 
 /**
- * Checks the claims this endpoint requires beyond signature, issuer, and audience, which the
+ * Checks the claims this endpoint requires beyond signature and audience, which the
  * auth middleware has verified. Returns the identity for an ordinary signed-in user, or null.
  */
 export function userIdentity(claims: Record<string, unknown>): AuthContext | null {

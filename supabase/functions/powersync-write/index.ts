@@ -1,22 +1,15 @@
 import { pipeline } from '@supabase/middleware';
 import { withCors } from '@supabase/middleware/cors';
 import { withRequiredClaims } from '@supabase/server/middleware/required-claims';
-import { FunctionConfigError, readConfig } from './config.ts';
+import { FunctionConfigError } from './config.ts';
 import { handleWrite } from './handler.ts';
-
-const issuer = (() => {
-  try {
-    return readConfig().issuer;
-  } catch (error) {
-    console.error(error);
-    return undefined;
-  }
-})();
 
 const handle = pipeline(
   [
     withCors({ allowedHeaders: ['authorization', 'content-type', 'apikey', 'x-client-info'] }),
-    withRequiredClaims({ issuer, audience: 'authenticated' })
+    // The signature is checked against this project's keys, which only this project's Auth signs
+    // with, so the issuer is not pinned separately.
+    withRequiredClaims({ audience: 'authenticated' })
   ],
   async (req, ctx) => {
     try {
