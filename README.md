@@ -95,6 +95,9 @@ separately to control which rows each user can read.
 and the optional dead-letter callback. By default, fatal failures other than `UNAUTHORIZED` are logged by the backend
 and removed from the client upload queue; authorization rejections stay queued. The callback does not provide durable storage.
 
+[Conflict resolution](docs/conflict-resolution.md) documents the approach taken in this reference implementation, as well as alternative
+conflict resolution approaches that can be implemented.
+
 ## API
 
 `backend/powersync-reference-write-api.openapi.yaml` defines `POST /api/data`. It accepts 1–50 transactions and processes
