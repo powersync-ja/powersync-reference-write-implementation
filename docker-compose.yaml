@@ -1,0 +1,44 @@
+# The write API, standalone. Assumes a hosted PowerSync instance and a database you already run —
+# this project owns neither. Set DATABASE_TYPE / DATABASE_URI in .env and export the instance's
+# auth config as described in docs/auth/setup.md.
+
+services:
+  backend:
+    build:
+      context: ./backend
+    # Bounded on purpose. A configuration error exits 1, and `unless-stopped` would respawn it
+    # forever, scrolling the message past. Three attempts still covers a transient crash.
+    restart: on-failure:3
+    # Configuration comes from .env then .env.local (later wins); see the README. Everything in
+    # them reaches the container, including AUTH_*.
+    # Do not list a variable under `environment:` below: it would override both files.
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.local
+        required: false
+    environment:
+      PORT: "6060"
+      POWERSYNC_CONFIG_PATH: /app/config/powersync-config.json
+    volumes:
+      # The directory, not the file, so a missing export is the backend's error to report and
+      # AUTH_MODE=env can start without one.
+      - type: bind
+        source: ${POWERSYNC_CONFIG_DIR:-./backend/config}
+        target: /app/config
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      - "6060:6060"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:6060/').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
+        ]
+      interval: 5s
+      timeout: 2s
+      retries: 15
