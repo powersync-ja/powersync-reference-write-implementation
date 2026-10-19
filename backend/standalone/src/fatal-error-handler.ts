@@ -1,5 +1,4 @@
-import { deliverDeadLetter, type FatalErrorContext, type FatalErrorHandler } from '../../shared/src/write/dead-letter.ts';
-import type { FatalOperationError } from '../../shared/src/errors.ts';
+import type { FatalErrorHandler } from '../../shared/src/write/dead-letter.ts';
 
 export type { DeadLetterEntry, FatalErrorContext, FatalErrorHandler } from '../../shared/src/write/dead-letter.ts';
 
@@ -17,8 +16,3 @@ export const fatalErrorHandler: FatalErrorHandler = {
     );
   }
 };
-
-/** Logs callback failures without changing the transaction result. Returned promises are not awaited. */
-export function notifyDeadLetter(error: FatalOperationError, context: FatalErrorContext): void {
-  void deliverDeadLetter(fatalErrorHandler, error, context);
-}
