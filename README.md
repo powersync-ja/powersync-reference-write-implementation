@@ -41,6 +41,8 @@ flags.
 
 Use the database that your PowerSync instance already replicates. Tables and columns
 must match uploaded operations unless you add custom [schema mapping](docs/schema-mapping.md).
+Each table also needs an `id` primary key or unique column holding the client's row ID; see
+[row ID](docs/schema-mapping.md#row-id).
 The default MongoDB mapper also requires collection `$jsonSchema` validators.
 
 In Docker Desktop, use `host.docker.internal` to reach a database on the host.

@@ -16,6 +16,15 @@ createPostgresPersister(uri, myCustomMapper);
 
 The factories are configured in `backend/standalone/src/persistence/persister-factories.ts`.
 
+## Row ID
+
+Each table that clients write needs a column named `id` (`_id` in MongoDB) that is the primary
+key or has a unique constraint, and holds the client's row ID. The adapters write and match rows
+by this column: Postgres upserts with `ON CONFLICT (id)`, and every adapter matches updates and
+deletes on it. A mapper can rename tables and other columns but not this one. Tables keyed
+differently, such as an integer serial, a column with another name, or a composite key, need a
+change to the persister under `backend/shared/src/persistence/<database>/`.
+
 ## Identifier validation
 
 Before any persister or mapper runs, the transaction processor
@@ -87,7 +96,7 @@ Copy the ID and field handling from `defaultMapper` instead of wrapping it: it l
 every call, which would repeat for every operation even though your mapper does map.
 
 ```ts
-// backend/standalone/src/mapping/renames.ts
+// backend/standalone/src/mapping/renames.ts (Express; see below for the Edge Function)
 import type { EntryMapper } from '../../../shared/src/mapping/types.ts';
 
 // Client table -> source table, and per-table client column -> source column.
@@ -121,6 +130,8 @@ table. Skipped operations are not an error.
 
 ### Installing it
 
+#### Express backend
+
 Factories take `(uri, mapper?)` and are stored in a record, so wrap the one you want. Edit
 `factories` in `backend/standalone/src/persistence/persister-factories.ts`. Identifier validation still
 applies, because the transaction processor runs it before any factory's persister:
@@ -138,6 +149,21 @@ export const factories: Record<string, PersisterFactory> = {
 
 Rebuild the image (`docker compose up --build`) because the TypeScript is compiled into it. Each
 engine's factory needs its own change.
+
+#### Supabase Edge Function
+
+Put the mapper in `backend/supabase/functions/powersync-write/` and import the type through the
+function's import map, `@powersync/write-core/mapping/types.ts`, instead of the relative path above.
+Then export it from `mapper.ts`:
+
+```ts
+import { renamingMapper } from './renames.ts';
+
+export const mapper = renamingMapper;
+```
+
+Redeploy with `supabase functions deploy powersync-write`. The function uses only the Postgres
+adapter, and identifier validation still applies.
 
 ### MongoDB
 

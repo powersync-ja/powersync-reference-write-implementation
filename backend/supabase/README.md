@@ -18,7 +18,10 @@ transaction-local. Your existing grants and row-level security policies (`auth.u
   [JWT signing keys guide](https://supabase.com/docs/guides/auth/signing-keys). The function
   gets the public keys from the platform; you do not copy keys or the JWT secret.
 - Grants to `authenticated` and RLS policies on every table clients write. Table and column
-  names must match the uploaded operations unless you change `mapper.ts`.
+  names must match the uploaded operations unless you change `mapper.ts`; see
+  [schema mapping](../../docs/schema-mapping.md#supabase-edge-function).
+- An `id` primary key or unique column on each of those tables, holding the client's row ID; see
+  [row ID](../../docs/schema-mapping.md#row-id).
 - Supabase CLI. Tested with 2.98.2.
 
 ## Authorization
