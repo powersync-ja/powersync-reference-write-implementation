@@ -14,14 +14,14 @@ as the second argument to the persister factory:
 createPostgresPersister(uri, myCustomMapper);
 ```
 
-The factories are configured in `backend/src/persistence/persister-factories.ts`.
+The factories are configured in `backend/standalone/src/persistence/persister-factories.ts`.
 
 ## Identifier validation
 
 Before any persister or mapper runs, the transaction processor
-(`backend/src/write/processor.ts`) checks the client-supplied table name and each `op_data` key
+(`backend/shared/src/write/processor.ts`) checks the client-supplied table name and each `op_data` key
 against `^[A-Za-z_][A-Za-z0-9_]*$` (at most 63 characters; see
-`backend/src/persistence/identifiers.ts`). This applies to every backend, including the
+`backend/shared/src/persistence/identifiers.ts`). This applies to every backend, including the
 Supabase Edge Function and any persister you install. A name that fails, such as `my-table`, `public.todos`
 or `$where`, rejects the transaction with an `INVALID_DATA` fatal error and the operation index.
 Rename the client table or column, or accept the plain name and map it to the real one in a
@@ -40,7 +40,7 @@ whole transaction is rolled back. See [error handling](error-handling.md).
 
 MongoDB uses `createMongoMapper`. At startup, `discoverSchema` reads collection
 `$jsonSchema` validators through `db.listCollections()` and builds a [Zod](https://zod.dev)
-schema for each collection (`backend/src/persistence/mongo/mongo-schema.ts`). The mapper validates
+schema for each collection (`backend/shared/src/persistence/mongo/mongo-schema.ts`). The mapper validates
 each write against it and converts client values to BSON types: SQLite `0`/`1` to booleans, and
 date strings or epoch numbers to `Date`. Required fields must be present on `PUT`; `PATCH`
 needs only the changed fields. Fields the validator does not mention, and types it cannot check
@@ -87,8 +87,8 @@ Copy the ID and field handling from `defaultMapper` instead of wrapping it: it l
 every call, which would repeat for every operation even though your mapper does map.
 
 ```ts
-// backend/src/mapping/renames.ts
-import type { EntryMapper } from './types.ts';
+// backend/standalone/src/mapping/renames.ts
+import type { EntryMapper } from '../../../shared/src/mapping/types.ts';
 
 // Client table -> source table, and per-table client column -> source column.
 const TABLES: Record<string, { table: string; columns: Record<string, string> }> = {
@@ -122,7 +122,7 @@ table. Skipped operations are not an error.
 ### Installing it
 
 Factories take `(uri, mapper?)` and are stored in a record, so wrap the one you want. Edit
-`factories` in `backend/src/persistence/persister-factories.ts`. Identifier validation still
+`factories` in `backend/standalone/src/persistence/persister-factories.ts`. Identifier validation still
 applies, because the transaction processor runs it before any factory's persister:
 
 ```ts
@@ -152,4 +152,4 @@ schemas.
 asynchronous database lookups or return writes to multiple tables or documents.
 
 Implement those operations in the relevant persister's `updateBatch` method under
-`backend/src/persistence/<database>/`, using its database connection and transaction.
+`backend/shared/src/persistence/<database>/`, using its database connection and transaction.

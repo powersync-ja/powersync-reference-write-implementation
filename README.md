@@ -8,14 +8,14 @@ this repository provides a reference implementation for both the client-side imp
 API which will support most simple use-cases.  It provides extension points that will allow you to customize
 the behavior to your own requirements, or you can modify it to suit your specific case.
 
-- [backend/powersync-reference-write-api.openapi.yaml](backend/powersync-reference-write-api.openapi.yaml) provides a simple but flexible API definition that serves as a contract between frontend and backend.
+- [backend/shared/powersync-reference-write-api.openapi.yaml](backend/shared/powersync-reference-write-api.openapi.yaml) provides a simple but flexible API definition that serves as a contract between frontend and backend.
 - A [reference implementation](example-client/src/PowersyncConnector.ts) of `uploadData` handles most common workflows. It will marshal queued changes to the format specified by the API definition. A [single-file version](example-client/src/PowersyncConnector.singlefile.ts) is provided for ease of copy-paste.
 - A [reference backend](backend) accepts API requests from the front-end and writes them to your source database. This includes an Express API, adapters for Postgres, MongoDB, MySQL, and SQL Server.
 
 You supply the database, PowerSync instance, client application, and application-specific authorization, and you must copy the example `uploadData` implementation to your front-end code.
 
 On Supabase, you can deploy the same write API as an Edge Function that enforces your RLS
-policies instead; see [Supabase Edge Function](supabase/README.md).
+policies instead; see [Supabase Edge Function](backend/supabase/README.md).
 
 ## Setup
 
@@ -51,13 +51,13 @@ such as `localhost`. Other Docker environments may require a host-gateway config
 
 The backend accepts tokens signed by keys it trusts, normally the same provider your PowerSync instance trusts,
 so clients authenticate with the same provider for read and write.
-The default `backend/src/auth/verifier.ts` reads a PowerSync Cloud JSON export, resolves its authentication settings, and builds a verifier.
+The default `backend/standalone/src/auth/verifier.ts` reads a PowerSync Cloud JSON export, resolves its authentication settings, and builds a verifier.
 It may need additional trusted settings, such as the expected issuer or audience.
 
 Choose an integration:
 
 - **PowerSync Cloud or self-hosted PowerSync:** save your config as
-  `backend/config/powersync-config.json` (the default) and set any `AUTH_*` supplements; see
+  `backend/standalone/config/powersync-config.json` (the default) and set any `AUTH_*` supplements; see
   [auth setup](docs/auth/setup.md#config-file-default).
 - **Any other provider (Clerk, Auth0, Supabase):** set `AUTH_MODE=env` with your issuer,
   audience and JWKS URL, no file needed. See [auth setup](docs/auth/setup.md#environment-variables-only)
@@ -89,7 +89,7 @@ computer or phone needs the backend's network address or a tunnel URL.
 ## Application behavior
 
 The default authorizer allows all authenticated writes. Add your application's checks in
-[`backend/src/auth/authorizer.ts`](backend/src/auth/authorizer.ts); see
+[`backend/standalone/src/auth/authorizer.ts`](backend/standalone/src/auth/authorizer.ts); see
 [authorization](docs/auth/authorization.md). Configure your PowerSync sync streams or rules
 separately to control which rows each user can read.
 
@@ -100,7 +100,7 @@ and removed from the client upload queue; authorization rejections stay queued. 
 
 ## API
 
-`backend/powersync-reference-write-api.openapi.yaml` defines `POST /api/data`. It accepts 1–50 transactions and processes
+`backend/shared/powersync-reference-write-api.openapi.yaml` defines `POST /api/data`. It accepts 1–50 transactions and processes
 them in order, each in its own database transaction. It returns one result per submitted
 transaction, including `not_attempted` for transactions after the stopping point.
 
@@ -141,5 +141,5 @@ pnpm --dir backend generate-types
 
 Tests use local fixtures and mocks; they need permission to open local listening ports,
 but no Docker, running database, or live identity provider. Type generation updates both
-`backend/src/generated/api.ts` and `example-client/src/generated/api.d.ts` from the OpenAPI
+`backend/shared/src/generated/api.ts` and `example-client/src/generated/api.d.ts` from the OpenAPI
 spec. Run it after editing the spec.

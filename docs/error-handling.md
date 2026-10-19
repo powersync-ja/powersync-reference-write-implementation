@@ -2,7 +2,7 @@
 
 Every fatal error defaults to backend handling, except `UNAUTHORIZED`, which stays queued on the
 client so a denied write is not lost. Replace the methods on
-`fatalErrorHandler` in `backend/src/fatal-error-handler.ts` to choose which errors need
+`fatalErrorHandler` in `backend/standalone/src/fatal-error-handler.ts` to choose which errors need
 client intervention and deliver backend-directed failures to your own storage or service.
 Authorization failures reach this handler before persistence starts. If a database transaction
 has started, its adapter attempts rollback before the failure reaches this handler.
@@ -13,7 +13,7 @@ connector retains queued transactions during outages. Credential failures, const
 unknown non-transient codes remain fatal. If acquisition fails, there is no client to roll
 back or release; transaction failures still attempt rollback and release the acquired client.
 
-The following replaces `fatalErrorHandler` in `backend/src/fatal-error-handler.ts`.
+The following replaces `fatalErrorHandler` in `backend/standalone/src/fatal-error-handler.ts`.
 `developerOwnedStorage` is a placeholder for your storage integration; supply its import and
 implementation. The file already declares `FatalErrorHandler`.
 
@@ -35,7 +35,7 @@ export const fatalErrorHandler: FatalErrorHandler = {
 };
 ```
 
-Import `FatalOperationError` from `backend/src/errors.ts` using the relative path for your
+Import `FatalOperationError` from `backend/shared/src/errors.ts` using the relative path for your
 file, then throw an application error from authorization, a mapper, or custom persistence logic:
 
 ```ts

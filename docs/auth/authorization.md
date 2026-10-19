@@ -5,9 +5,9 @@ caller may make. The default authorizer allows all authenticated writes.
 
 ## Authorization hook
 
-`backend/src/auth/authorizer.ts` exports an `Authorizer` (the interface is defined in
-`backend/src/types.ts`), called once per transaction by the transaction processor
-(`backend/src/write/processor.ts`) before persistence:
+`backend/standalone/src/auth/authorizer.ts` exports an `Authorizer` (the interface is defined in
+`backend/shared/src/types.ts`), called once per transaction by the transaction processor
+(`backend/shared/src/write/processor.ts`) before persistence:
 
 ```ts
 export interface Authorizer {
@@ -22,13 +22,13 @@ Returning `false` rejects the whole transaction with `UNAUTHORIZED`. The default
 [fatal-error handler](../error-handling.md) treats this as client-directed: the transaction stays
 queued on the client and is retried, so a denied write is not lost. It blocks later uploads
 until the permission is granted or the app's `onFatalTransaction` hook releases it. To drop
-denied writes instead, change `requiresClientHandling` in `backend/src/fatal-error-handler.ts`.
+denied writes instead, change `requiresClientHandling` in `backend/standalone/src/fatal-error-handler.ts`.
 
 Replace `authorizer` with your application's checks, such as table permissions or
 required roles. The default implementation logs this message on every call:
 
 ```
-Authorization is not configured. All authenticated writes are allowed. Configure backend/src/auth/authorizer.ts; see docs/auth/authorization.md.
+Authorization is not configured. All authenticated writes are allowed. Configure backend/standalone/src/auth/authorizer.ts; see docs/auth/authorization.md.
 ```
 
 ## Checking existing rows
@@ -41,7 +41,7 @@ Use `authorize()` for checks that need no database lookup. For example, an appli
 that accepts writes only to `lists` and `todos` could use:
 
 ```ts
-// Replace the existing export in backend/src/auth/authorizer.ts.
+// Replace the existing export in backend/standalone/src/auth/authorizer.ts.
 export const authorizer: Authorizer = {
   authorize(crud) {
     return crud.every((entry) => ['lists', 'todos'].includes(entry.table));

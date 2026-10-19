@@ -7,7 +7,7 @@ environment variables alone (`AUTH_MODE=env`). Set variables in `.env` or `.env.
 
 ## Config file (default)
 
-The file is `backend/config/powersync-config.json`. It is either a PowerSync Cloud export or the
+The file is `backend/standalone/config/powersync-config.json`. It is either a PowerSync Cloud export or the
 `client_auth` section of a self-hosted service config; the backend recognises which from its shape.
 Keep it out of version control: it can contain database settings and secret references. This
 repository ignores `powersync-config*.json` and excludes it from Docker images.
@@ -17,7 +17,7 @@ so the same tokens work for the read and write paths:
 
 ```sh
 powersync login
-powersync fetch config --instance-id="<instance-id>" --output=json > backend/config/powersync-config.json
+powersync fetch config --instance-id="<instance-id>" --output=json > backend/standalone/config/powersync-config.json
 ```
 
 Alternatively, run `powersync link cloud --instance-id="<instance-id>"` once, then omit the
@@ -75,8 +75,8 @@ unset or blank means not set.
 | `AUTH_JWKS_URI_OVERRIDE` | all | Read keys from this address instead, when the backend reaches the key endpoint differently than PowerSync does (for example a Docker network name). |
 | `AUTH_ALLOW_LOCAL_HTTP`, `AUTH_ALLOW_INSECURE_HTTP_HOSTS` | all | Plain-HTTP key endpoints. HTTPS is required by default; `AUTH_ALLOW_LOCAL_HTTP=true` permits loopback, and other hosts must be named exactly (no wildcards). |
 | `AUTH_ALGORITHMS` | all | A narrower asymmetric allowlist than the RS/PS/ES/EdDSA default. |
-| `POWERSYNC_CONFIG_DIR` | file | Docker Compose only: host directory holding `powersync-config.json` (default `backend/config`). |
-| `POWERSYNC_CONFIG_PATH` | file | Running on the host: path to the file, instead of `backend/config/powersync-config.json`. |
+| `POWERSYNC_CONFIG_DIR` | file | Docker Compose only: host directory holding `powersync-config.json` (default `backend/standalone/config`). |
+| `POWERSYNC_CONFIG_PATH` | file | Running on the host: path to the file, instead of `backend/standalone/config/powersync-config.json`. |
 
 ## Verification behavior
 
