@@ -62,6 +62,8 @@ Choose an integration:
 - **Any other provider (Clerk, Auth0, Supabase):** set `AUTH_MODE=env` with your issuer,
   audience and JWKS URL, no file needed. See [auth setup](docs/auth/setup.md#environment-variables-only)
   and the [Supabase and Clerk guide](docs/auth/providers.md).
+- **Trying it out with no provider:** use
+  [PowerSync development tokens](docs/auth/development-tokens.md).
 
 ### 3. Start the API
 
@@ -97,6 +99,9 @@ separately to control which rows each user can read.
 [Error handling](docs/error-handling.md) explains rejected transactions, queue retention,
 and the optional dead-letter callback. By default, fatal failures other than `UNAUTHORIZED` are logged by the backend
 and removed from the client upload queue; authorization rejections stay queued. The callback does not provide durable storage.
+
+[Conflict resolution](docs/conflict-resolution.md) documents the approach taken in this reference implementation, as well as alternative
+conflict resolution approaches that can be implemented.
 
 ## API
 

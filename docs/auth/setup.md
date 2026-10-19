@@ -96,7 +96,8 @@ requires updating the file and restarting.
 
 The built-in resolver supports one issuer and one audience policy per verifier. It rejects
 symmetric keys, private keys, legacy Supabase secrets, and configurations with no supported
-verification keys. PowerSync temporary tokens are excluded. Tokens without `aud`, such as Clerk
+verification keys. PowerSync temporary tokens are excluded from config exports; for
+[development tokens](development-tokens.md), use `AUTH_MODE=env` instead. Tokens without `aud`, such as Clerk
 session tokens, are supported only through `AUTH_REQUIRE_AUDIENCE=false` with `AUTH_AUTHORIZED_PARTIES`;
 see [Supabase and Clerk](providers.md).
 
