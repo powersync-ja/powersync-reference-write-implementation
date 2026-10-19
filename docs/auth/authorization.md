@@ -1,5 +1,10 @@
 # Authorization
 
+> [!NOTE]
+> Using the [Supabase Edge Function](../../backend/supabase/README.md)? Authorize writes with
+> row-level security; the authorization hook below is optional. See
+> [Supabase authorization](../../backend/supabase/README.md#authorization).
+
 Authentication identifies the caller. Authorization determines which writes the
 caller may make. The default authorizer allows all authenticated writes.
 
@@ -78,7 +83,11 @@ The `true` argument scopes the setting to that transaction. Your row-level secur
 policies can read it with `current_setting('app.user_id', true)`.
 
 **N.B. This backend sets the
-identity value but does not create policies.** You must define and enable policies for your schema and database role. 
+identity value but does not create policies.** You must define and enable policies for your schema and database role.
+
+The Supabase Edge Function works differently: it runs each transaction as the `authenticated`
+role, so standard Supabase policies using `auth.uid()` apply and `app.user_id` is not needed. See
+[Supabase authorization](../../backend/supabase/README.md#authorization).
 
 ### Requirements for policies to take effect
 

@@ -7,6 +7,10 @@ client intervention and deliver backend-directed failures to your own storage or
 Authorization failures reach this handler before persistence starts. If a database transaction
 has started, its adapter attempts rollback before the failure reaches this handler.
 
+The Supabase Edge Function's default handler differs: it sends every fatal error, including
+`UNAUTHORIZED` from an RLS policy or missing grant, to `onDeadLetter`, so those writes leave the
+client queue. Change `requiresClientHandling` in its `fatal-error-handler.ts` to keep them queued.
+
 Postgres connection acquisition failures are classified before routing. Known transient Node
 transport failures, such as `ECONNREFUSED` and `ECONNRESET`, return `retryable_error` so the
 connector retains queued transactions during outages. Credential failures, constraints and
@@ -29,7 +33,7 @@ export const fatalErrorHandler: FatalErrorHandler = {
     // Called for rejected transactions when requiresClientHandling returns false.
     // Store the entry for investigation or notify your support team, for example.
     // Replace this insert with your own integration; delivery is best effort.
-    // The returned promise is not awaited (see delivery behavior below).
+    // The Express backend does not await the returned promise (see delivery behavior below).
     await developerOwnedStorage.insert(entry);
   }
 };
@@ -58,9 +62,11 @@ is included because the API rejected it as a unit. A connection failure during c
 leave the database outcome uncertain; investigate that outcome before replaying writes.
 The occurrence ID identifies this notification attempt, not a stable transaction deduplication key.
 
-Delivery is best effort. The server invokes `onDeadLetter` without awaiting its promise;
+Delivery is best effort. The Express backend invokes `onDeadLetter` without awaiting its promise;
 synchronous exceptions and rejected promises are logged, and an unresolved promise does not
-block the response. A handler doing synchronous work can still delay the event loop. Delivery
+block the response. The Supabase Edge Function instead awaits `onDeadLetter` before responding,
+because its worker may stop once the response is sent; a slow handler delays the response there.
+Edit its handler in `backend/supabase/functions/powersync-write/fatal-error-handler.ts`. A handler doing synchronous work can still delay the event loop. Delivery
 may fail or be lost at shutdown. Repeated uploads can produce duplicate notifications. There
 is no built-in persistence, delivery retry, replay API, or deduplication. Implement these in
 your own service if required. The default handler logs the entry and points to this guide.

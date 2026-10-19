@@ -5,12 +5,12 @@ PowerSync automatically queues these mutations for processing using the `uploadD
 
 While there are no restrictions on the implementation of `uploadData` and the related backend API,
 this repository provides a reference implementation for both the client-side implementation and the backend
-API which will support most simple use-cases.  It provides extension points that will allow you to customize
+API which will support most simple use cases. It provides extension points that will allow you to customize
 the behavior to your own requirements, or you can modify it to suit your specific case.
 
 - [backend/shared/powersync-reference-write-api.openapi.yaml](backend/shared/powersync-reference-write-api.openapi.yaml) provides a simple but flexible API definition that serves as a contract between frontend and backend.
 - A [reference implementation](example-client/src/PowersyncConnector.ts) of `uploadData` handles most common workflows. It will marshal queued changes to the format specified by the API definition. A [single-file version](example-client/src/PowersyncConnector.singlefile.ts) is provided for ease of copy-paste.
-- A [reference backend](backend) accepts API requests from the front-end and writes them to your source database. This includes an Express API, adapters for Postgres, MongoDB, MySQL, and SQL Server.
+- A [reference backend](backend) accepts API requests from the front-end and writes them to your source database. [backend/standalone](backend/standalone) is the Express API; [backend/shared](backend/shared) holds the transaction processor and the adapters for Postgres, MongoDB, MySQL, and SQL Server, which the Express API and the Supabase Edge Function both use.
 
 You supply the database, PowerSync instance, client application, and application-specific authorization, and you must copy the example `uploadData` implementation to your front-end code.
 
@@ -30,9 +30,9 @@ Set these in `.env.local` (or the root `.env` for shared defaults) for Docker Co
 | --- | --- |
 | `DATABASE_TYPE` | `postgres` (default), `mongodb`, `mysql`, or `mssql` |
 | `DATABASE_URI` | Required connection string for your source database |
+| `BATCH_ON_FATAL_ERROR` | `stop` (default) or `skip`; see [error handling](docs/error-handling.md) |
 
 Connection string notes: percent-encode special characters in passwords. Postgres accepts `?sslmode=require` (or `verify-full`) for managed databases. MSSQL verifies the server certificate by default; add `?trustServerCertificate=true` only for self-signed development servers. Missing ports default to 5432 (Postgres) and 1433 (MSSQL). Pools are capped at 10 connections with connect and statement timeouts.
-| `BATCH_ON_FATAL_ERROR` | `stop` (default) or `skip`; see [error handling](docs/error-handling.md) |
 
 `.env` is committed, so keep it to shared defaults. Put this machine's values and any secret, such
 as a `DATABASE_URI` with a password, in `.env.local`. This is gitignored, optional, and
@@ -92,8 +92,10 @@ computer or phone needs the backend's network address or a tunnel URL.
 
 The default authorizer allows all authenticated writes. Add your application's checks in
 [`backend/standalone/src/auth/authorizer.ts`](backend/standalone/src/auth/authorizer.ts); see
-[authorization](docs/auth/authorization.md). Configure your PowerSync sync streams or rules
-separately to control which rows each user can read.
+[authorization](docs/auth/authorization.md). On the Supabase Edge Function, your RLS policies
+authorize each write and the authorizer is optional; see
+[Supabase authorization](backend/supabase/README.md#authorization). Configure your PowerSync sync
+streams or rules separately to control which rows each user can read.
 
 [Schema mapping](docs/schema-mapping.md) describes field conversion and custom writes.
 [Error handling](docs/error-handling.md) explains rejected transactions, queue retention,
@@ -142,9 +144,31 @@ Rebuild the image after code changes when using Compose without the development 
 pnpm --dir backend test
 pnpm --dir backend check
 pnpm --dir backend generate-types
+pnpm --dir backend generate-edge-validator
 ```
 
-Tests use local fixtures and mocks; they need permission to open local listening ports,
-but no Docker, running database, or live identity provider. Type generation updates both
-`backend/shared/src/generated/api.ts` and `example-client/src/generated/api.d.ts` from the OpenAPI
-spec. Run it after editing the spec.
+These tests cover the shared core and the Express backend. They use local fixtures and mocks;
+they need permission to open local listening ports, but no Docker, running database, or live
+identity provider. After editing the OpenAPI spec, run both generators: `generate-types` updates
+`backend/shared/src/generated/api.ts` and `example-client/src/generated/api.d.ts`, and
+`generate-edge-validator` updates `backend/shared/src/generated/transaction-batch-validator.ts`,
+which the Edge Function uses. A test fails if the validator is stale.
+
+### Edge Function tests
+
+These need Docker, Deno, and the Supabase CLI. Start the local stack and serve the function from
+`backend/`, then run the tests in another terminal:
+
+```bash
+cd backend
+supabase start
+supabase functions serve
+```
+
+```bash
+cd backend/supabase/functions/powersync-write
+deno task test
+```
+
+`hosted.test.ts` runs only against a deployed function and skips unless the
+`POWERSYNC_TEST_HOSTED_*` variables described at the top of that file are set.

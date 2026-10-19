@@ -3,8 +3,9 @@
 Backend settings that are specific to these providers. For everything else, see
 [auth setup](setup.md).
 
-In the connector you copied, return the provider's token from the private `getAuthToken()`
-method (writes) and `fetchCredentials()` (sync), and remove the demo token cache. If sync and
+In the connector you copied, return the provider's token from the private `fetchAuthToken()`
+method, which supplies both writes and `fetchCredentials()` (sync). Provider SDKs manage their
+own sessions, so you can drop the demo token cache in `getAuthToken()`. If sync and
 writes use different tokens, both must carry the same user ID in `sub`.
 
 ## Supabase
@@ -16,6 +17,13 @@ issuer, audience and JWKS URL are derived for standard hosted projects; a custom
 
 Legacy HS256 secrets are rejected. Migrate to
 [Supabase signing keys](https://supabase.com/docs/guides/auth/signing-keys) and re-export.
+
+The Express backend does not write as the Supabase user, so policies that use `auth.uid()` or
+`auth.jwt()` do not apply to its writes, and it usually connects as a role that bypasses RLS.
+Authorize in its [authorization hook](authorization.md) instead. If your data lives in Supabase
+Postgres and you rely on RLS, deploy the write API as the
+[Supabase Edge Function](../../backend/supabase/README.md) instead. It needs no auth settings and
+applies your existing RLS policies to each write.
 
 ## Clerk
 

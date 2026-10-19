@@ -21,6 +21,40 @@ transaction-local. Your existing grants and row-level security policies (`auth.u
   names must match the uploaded operations unless you change `mapper.ts`.
 - Supabase CLI. Tested with 2.98.2.
 
+## Authorization
+
+Row-level security and grants are the authorization for this function. Deployed without code
+changes, it checks every write against your RLS policies as the signed-in user. You do not need
+to edit `authorizer.ts`.
+
+Before deploying, enable RLS on every table clients can write and add policies for each operation
+they upload. PUT is an upsert, so it needs `INSERT` and `UPDATE` policies, and the existing row
+must be visible to the user. PATCH needs `UPDATE` and DELETE needs `DELETE`. Use `WITH CHECK` so
+users cannot assign rows to someone else.
+
+> [!WARNING]
+> A table without RLS is writable by any signed-in user, for any row, if `authenticated` has
+> grants on it. Check every table in the schemas clients write to, not only the ones you sync.
+
+For example, letting users manage only their own lists:
+
+```sql
+grant select, insert, update, delete on public.lists to authenticated;
+alter table public.lists enable row level security;
+
+create policy "Owners manage their lists" on public.lists
+  for all to authenticated
+  using (owner_id = (select auth.uid()))
+  with check (owner_id = (select auth.uid()));
+```
+
+A write that a policy or missing grant denies returns a fatal `UNAUTHORIZED` result for the
+whole transaction. By default the client then drops it from its upload queue; see
+[error handling](../../docs/error-handling.md) to keep it queued instead.
+
+Use `authorizer.ts` only for checks RLS cannot express, such as rejecting a transaction based on
+which tables it touches before any write runs. RLS still applies to every write it allows.
+
 ## Deploy to your project
 
 Deploy from a clone of this repository into your existing Supabase project. Deploying one
@@ -31,6 +65,13 @@ function does not change your other functions, schema, or settings. Run the comm
 > Against your project, run only `supabase functions deploy powersync-write` and
 > `supabase secrets set` from this repository. Other commands, such as `supabase config push`,
 > can apply this repository's local development config to your project.
+
+To deploy from your own repository instead, copy all of `backend/` and run the same commands
+from there. To keep the function inside your own `supabase/` directory, copy
+`functions/powersync-write` into it and copy `backend/shared` next to that `supabase/` directory,
+because the function's `deno.json` maps `@powersync/write-core/` to `../../../shared/src/`. If you
+place `shared` elsewhere, update that path. Copy only the `[functions.powersync-write]` section
+(`verify_jwt = true`) into your `config.toml`, not this repository's whole config.
 
 ### 1. Link the project
 
@@ -57,23 +98,25 @@ curl -i -X OPTIONS https://<project-ref>.supabase.co/functions/v1/powersync-writ
 curl -i -X POST https://<project-ref>.supabase.co/functions/v1/powersync-write/api/data
 ```
 
-The browser preflight returns `204` without a token, and the unauthenticated POST returns `401`. A write with a signed-in
-user's access token returns `200` and one result per transaction.
+The browser preflight returns `204` without a token, and the unauthenticated POST returns `401`.
+A write with a signed-in user's access token returns `200` and one result per transaction.
 
 ## Connect a client
 
-Set the connector's backend base URL to the function URL. The connector appends `/api/data`:
+Set the connector's backend base URL (`VITE_BACKEND_URL`, or `BACKEND_URL` in the single-file
+connector) to the function URL. The connector appends `/api/data`:
 
 ```text
 https://<project-ref>.supabase.co/functions/v1/powersync-write
 ```
 
-Send the user's
-Supabase session access token as the bearer token. API keys, anon tokens, and service-role
-tokens are rejected.
+Send the user's Supabase session access token as the bearer token. API keys, anon tokens, and
+service-role tokens are rejected.
 
-Your PowerSync sync URL does not change. See [example-client](../../example-client/README.md)
-for the connector settings.
+Your PowerSync sync URL does not change, and your PowerSync instance must trust the same
+Supabase Auth tokens; see PowerSync's
+[Supabase Auth setup](https://docs.powersync.com/configuration/auth/supabase-auth). See
+[example-client](../../example-client/README.md) for the connector settings.
 
 ## Customize
 
@@ -82,8 +125,8 @@ Edit these files in `backend/supabase/functions/powersync-write/`:
 | File | Purpose |
 | --- | --- |
 | `mapper.ts` | Map client tables and columns; see [schema mapping](../../docs/schema-mapping.md) |
-| `authorizer.ts` | Extra checks before each transaction; RLS still applies |
-| `fatal-error-handler.ts` | Route permanent failures; see [error handling](../../docs/error-handling.md). `onDeadLetter` is awaited before the response |
+| `authorizer.ts` | Optional checks before each transaction; RLS is the primary authorization (see [Authorization](#authorization)) |
+| `fatal-error-handler.ts` | Route permanent failures; see [error handling](../../docs/error-handling.md). By default every fatal error, including `UNAUTHORIZED`, leaves the client queue. `onDeadLetter` is awaited before the response |
 | `config.ts` | Batch policy (`stop`/`skip`), per-worker pool limits, and the statement timeout |
 
 Redeploy after editing.

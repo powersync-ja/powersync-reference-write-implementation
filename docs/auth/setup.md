@@ -5,6 +5,9 @@ backend gets its verification settings from a PowerSync config file (the default
 environment variables alone (`AUTH_MODE=env`). Set variables in `.env` or `.env.local` (or
 `backend/.env` when running on the host).
 
+This page applies to the Express backend. The [Supabase Edge Function](../../backend/supabase/README.md)
+verifies Supabase Auth tokens with the keys the platform provides and needs none of these settings.
+
 ## Config file (default)
 
 The file is `backend/standalone/config/powersync-config.json`. It is either a PowerSync Cloud export or the
