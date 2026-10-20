@@ -51,9 +51,21 @@ create policy "Owners manage their lists" on public.lists
   with check (owner_id = (select auth.uid()));
 ```
 
-A write that a policy or missing grant denies returns a fatal `UNAUTHORIZED` result for the
-whole transaction. By default the client then drops it from its upload queue; see
-[error handling](../../docs/error-handling.md) to keep it queued instead.
+> [!WARNING]
+> A write that a policy or missing grant denies returns a fatal `UNAUTHORIZED` result for the
+> whole transaction, and by default the write is discarded. The client drops it from its upload
+> queue, the next sync replaces the user's local change with the server's data, and only
+> `onDeadLetter` in `fatal-error-handler.ts` records it. A mistake in a policy or grant therefore
+> loses user writes without an error the user sees. Test your policies before deploying, and send
+> `onDeadLetter` somewhere you monitor.
+>
+> The Express backend instead keeps `UNAUTHORIZED` queued by default. Keeping it
+> queued preserves the change but blocks that user's later uploads until it is handled. To
+> choose that, change `requiresClientHandling` in `fatal-error-handler.ts`; see
+> [error handling](../../docs/error-handling.md).
+>
+> PATCH and DELETE of a row that RLS hides from the user succeed without changing anything; see
+> [Database connection](#database-connection).
 
 Use `authorizer.ts` only for checks RLS cannot express, such as rejecting a transaction based on
 which tables it touches before any write runs. RLS still applies to every write it allows.
@@ -120,6 +132,43 @@ Your PowerSync sync URL does not change, and your PowerSync instance must trust 
 Supabase Auth tokens; see PowerSync's
 [Supabase Auth setup](https://docs.powersync.com/configuration/auth/supabase-auth). See
 [example-client](../../example-client/README.md) for the connector settings.
+
+### Using Supabase Auth in the connector
+
+Pass your app's supabase-js client to the copied connector and read the session on every call.
+Do not keep the connector's token cache: supabase-js refreshes the session itself, and the cache
+is cleared only after a rejected write, so sync would keep receiving an expired token. In
+`PowersyncConnector.ts`, replace `fetchCredentials()`, `fetchAuthToken()`, and `getAuthToken()`:
+
+```ts
+constructor(private readonly supabase: SupabaseClient) {
+  // existing setup
+}
+
+async fetchCredentials() {
+  const session = await this.getSession();
+  return {
+    endpoint: this.config.powersyncUrl,
+    token: session.access_token,
+    expiresAt: session.expires_at ? new Date(session.expires_at * 1000) : undefined
+  };
+}
+
+private async getSession() {
+  const { data: { session }, error } = await this.supabase.auth.getSession();
+  if (!session || error) throw new Error('Not signed in to Supabase');
+  return session;
+}
+
+// Write requests call this through the transport.
+private async getAuthToken(): Promise<string> {
+  return (await this.getSession()).access_token;
+}
+```
+
+The single-file connector has the same methods; use `POWERSYNC_URL` instead of
+`this.config.powersyncUrl`. Remove the now-unused `_authToken` field, including its reset in
+`onTransportError()`. Uploads, batching, and error handling are unchanged.
 
 ## Customize
 
