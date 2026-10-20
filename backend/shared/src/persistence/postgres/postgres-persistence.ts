@@ -27,14 +27,18 @@ export interface PostgresPersisterOptions {
   /**
    * Runs inside each database transaction after BEGIN and before the first operation.
    * Use transaction-local settings only, because connections are reused. Defaults to
-   * exposing the verified subject as app.user_id.
+   * exposing the verified claims as request.jwt.claims.
    */
   initializeTransaction?: (client: PG.PoolClient, auth: AuthContext) => Promise<void>;
 }
 
-/** Exposes the verified subject for this transaction as current_setting('app.user_id', true). */
-export const setAppUserId = async (client: PG.PoolClient, auth: AuthContext): Promise<void> => {
-  await client.query('SELECT set_config($1, $2, true)', ['app.user_id', auth.sub]);
+/**
+ * Exposes the verified token claims for this transaction as request.jwt.claims, the PostgREST
+ * convention that Supabase's auth.uid() and auth.jwt() also read. Policies read the subject with
+ * current_setting('request.jwt.claims', true)::json->>'sub'.
+ */
+export const setJwtClaims = async (client: PG.PoolClient, auth: AuthContext): Promise<void> => {
+  await client.query('SELECT set_config($1, $2, true)', ['request.jwt.claims', JSON.stringify(auth.claims)]);
 };
 
 export const createPostgresPersister = (
@@ -44,7 +48,7 @@ export const createPostgresPersister = (
 ): Persister & { end(): Promise<void> } => {
   console.debug('Using Postgres Persister');
 
-  const initializeTransaction = options.initializeTransaction ?? setAppUserId;
+  const initializeTransaction = options.initializeTransaction ?? setJwtClaims;
   // pg parses the connection string itself: percent-encoded credentials are decoded, a missing
   // port defaults to 5432, and sslmode (e.g. ?sslmode=require) is honoured.
   const poolConfig: PG.PoolConfig = {
@@ -80,7 +84,7 @@ export const createPostgresPersister = (
           await client.query(`SELECT set_config('statement_timeout', $1, true)`, [String(statementTimeout)]);
         }
 
-        // By default this exposes the verified subject to application RLS policies; see
+        // By default this exposes the verified claims to application RLS policies; see
         // docs/auth/authorization.md.
         await initializeTransaction(client, auth);
 

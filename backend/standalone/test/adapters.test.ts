@@ -162,10 +162,14 @@ describe('Postgres connection recovery', () => {
       statement_timeout: 5000
     });
   });
-  it('sets app.user_id by default and runs a custom transaction initializer instead when given', async () => {
-    await createPostgresPersister('postgres://user:pass@localhost:5432/db').updateBatch(batch, auth);
-    // The default 30 s statement timeout, then app.user_id.
-    expect(db.setConfig.mock.calls.map(([, params]) => params)).toEqual([['30000'], ['app.user_id', auth.sub]]);
+  it('sets request.jwt.claims by default and runs a custom transaction initializer instead when given', async () => {
+    const withClaims = { sub: 'verified', claims: { sub: 'verified', role: 'authenticated' } };
+    await createPostgresPersister('postgres://user:pass@localhost:5432/db').updateBatch(batch, withClaims);
+    // The default 30 s statement timeout, then the verified claims as JSON.
+    expect(db.setConfig.mock.calls.map(([, params]) => params)).toEqual([
+      ['30000'],
+      ['request.jwt.claims', JSON.stringify(withClaims.claims)]
+    ]);
 
     db.setConfig.mockReset();
     const initializeTransaction = vi.fn().mockResolvedValue(undefined);
