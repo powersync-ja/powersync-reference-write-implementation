@@ -1,6 +1,8 @@
 # Conflict resolution
 
-How this backend resolves conflicts between client writes today.
+How this backend resolves conflicts between client writes today. This applies to the Express
+backend and the Supabase Edge Function, which share the same transaction processor and Postgres
+adapter. On Supabase, a row hidden by RLS counts as a row that does not exist.
 
 ## Summary
 

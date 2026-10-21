@@ -14,13 +14,24 @@ as the second argument to the persister factory:
 createPostgresPersister(uri, myCustomMapper);
 ```
 
-The factories are configured in `backend/src/persistence/persister-factories.ts`.
+The factories are configured in `backend/standalone/src/persistence/persister-factories.ts`.
+
+## Row ID
+
+Each table that clients write needs a column named `id` (`_id` in MongoDB) that is the primary
+key or has a unique constraint, and holds the client's row ID. The adapters write and match rows
+by this column: Postgres upserts with `ON CONFLICT (id)`, and every adapter matches updates and
+deletes on it. A mapper can rename tables and other columns but not this one. Tables keyed
+differently, such as an integer serial, a column with another name, or a composite key, need a
+change to the persister under `backend/shared/src/persistence/<database>/`.
 
 ## Identifier validation
 
-Before the mapper runs, the wrappers in `backend/src/persistence/persister-factories.ts` check the client-supplied table name and each `op_data`
-key against `^[A-Za-z_][A-Za-z0-9_]*$` (at most 63 characters; see
-`backend/src/persistence/identifiers.ts`). A name that fails, such as `my-table`, `public.todos`
+Before any persister or mapper runs, the transaction processor
+(`backend/shared/src/write/processor.ts`) checks the client-supplied table name and each `op_data` key
+against `^[A-Za-z_][A-Za-z0-9_]*$` (at most 63 characters; see
+`backend/shared/src/persistence/identifiers.ts`). This applies to every backend, including the
+Supabase Edge Function and any persister you install. A name that fails, such as `my-table`, `public.todos`
 or `$where`, rejects the transaction with an `INVALID_DATA` fatal error and the operation index.
 Rename the client table or column, or accept the plain name and map it to the real one in a
 custom mapper. Names a mapper returns are not subject to this check, so a mapper can target
@@ -38,7 +49,7 @@ whole transaction is rolled back. See [error handling](error-handling.md).
 
 MongoDB uses `createMongoMapper`. At startup, `discoverSchema` reads collection
 `$jsonSchema` validators through `db.listCollections()` and builds a [Zod](https://zod.dev)
-schema for each collection (`backend/src/persistence/mongo/mongo-schema.ts`). The mapper validates
+schema for each collection (`backend/shared/src/persistence/mongo/mongo-schema.ts`). The mapper validates
 each write against it and converts client values to BSON types: SQLite `0`/`1` to booleans, and
 date strings or epoch numbers to `Date`. Required fields must be present on `PUT`; `PATCH`
 needs only the changed fields. Fields the validator does not mention, and types it cannot check
@@ -85,8 +96,8 @@ Copy the ID and field handling from `defaultMapper` instead of wrapping it: it l
 every call, which would repeat for every operation even though your mapper does map.
 
 ```ts
-// backend/src/mapping/renames.ts
-import type { EntryMapper } from './types.ts';
+// backend/standalone/src/mapping/renames.ts (Express; see below for the Edge Function)
+import type { EntryMapper } from '../../../shared/src/mapping/types.ts';
 
 // Client table -> source table, and per-table client column -> source column.
 const TABLES: Record<string, { table: string; columns: Record<string, string> }> = {
@@ -119,14 +130,16 @@ table. Skipped operations are not an error.
 
 ### Installing it
 
+#### Express backend
+
 Factories take `(uri, mapper?)` and are stored in a record, so wrap the one you want. Edit
-`unvalidatedFactories` in `backend/src/persistence/persister-factories.ts`. The exported
-`factories` wraps every entry with identifier validation, including yours:
+`factories` in `backend/standalone/src/persistence/persister-factories.ts`. Identifier validation still
+applies, because the transaction processor runs it before any factory's persister:
 
 ```ts
 import { renamingMapper } from '../mapping/renames.ts';
 
-const unvalidatedFactories: Record<string, PersisterFactory> = {
+export const factories: Record<string, PersisterFactory> = {
   mongodb: createMongoPersister,
   postgres: createPostgresPersister,
   mysql: (uri) => createMySQLPersister(uri, renamingMapper),
@@ -136,6 +149,21 @@ const unvalidatedFactories: Record<string, PersisterFactory> = {
 
 Rebuild the image (`docker compose up --build`) because the TypeScript is compiled into it. Each
 engine's factory needs its own change.
+
+#### Supabase Edge Function
+
+Put the mapper in `backend/supabase/functions/powersync-write/` and import the type through the
+function's import map, `@powersync/write-core/mapping/types.ts`, instead of the relative path above.
+Then export it from `mapper.ts`:
+
+```ts
+import { renamingMapper } from './renames.ts';
+
+export const mapper = renamingMapper;
+```
+
+Redeploy with `supabase functions deploy powersync-write`. The function uses only the Postgres
+adapter, and identifier validation still applies.
 
 ### MongoDB
 
@@ -150,4 +178,4 @@ schemas.
 asynchronous database lookups or return writes to multiple tables or documents.
 
 Implement those operations in the relevant persister's `updateBatch` method under
-`backend/src/persistence/<database>/`, using its database connection and transaction.
+`backend/shared/src/persistence/<database>/`, using its database connection and transaction.

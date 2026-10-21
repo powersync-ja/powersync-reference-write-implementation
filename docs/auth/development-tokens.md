@@ -2,12 +2,13 @@
 
 Development tokens let you try the write API without an auth provider. PowerSync Cloud signs a
 token for any user ID you choose, and it expires after 12 hours. They are for local development
-and debugging only, use a [real provider](setup.md) in production.
+and debugging only; use a [real provider](setup.md) in production. They work with the Express
+backend. The Supabase Edge Function accepts only Supabase Auth user tokens.
 
 ## 1. Generate a token
 
 1. In the PowerSync Dashboard, open the **Client Auth** view, enable **Development tokens** and save.
-3. Click **Connect** in the top bare, enter a user ID, click **Generate Token** and copy it.
+2. Click **Connect** in the top bar, enter a user ID, click **Generate Token** and copy it.
 
 ## 2. Trust the development keys
 
@@ -30,5 +31,5 @@ Restart the backend after changing these.
 
 ## 3. Use the token
 
-Return the same token from both connector methods in the copy of the connector in your client:
-`fetchCredentials()` for sync, and the private `getAuthToken()` for writes.
+In your copy of the connector, return the token from the private `fetchAuthToken()` method.
+Both `fetchCredentials()` (sync) and writes use it.

@@ -67,7 +67,10 @@ also adapt `fetchCredentials()`, keeping the same user ID in both tokens.
 
 The modular transport's token callback is `getAuthToken`; its timeout option is `timeoutMs`.
 The demo clears its cached token after a 401/403 write response. Provider SDKs should manage
-provider sessions without the demo cache.
+provider sessions without the demo cache. If your provider SDK refreshes sessions itself, remove
+the cache in `getAuthToken()` and read the session on each call; otherwise sync keeps using an
+expired token. For Supabase, see
+[Using Supabase Auth in the connector](../backend/supabase/README.md#using-supabase-auth-in-the-connector).
 
 ## Rejected writes
 
@@ -77,7 +80,7 @@ See [error handling](../docs/error-handling.md) before implementing release or r
 
 ## API and connector changes
 
-From the repository root, regenerate types after changing `backend/powersync-reference-write-api.openapi.yaml`:
+From the repository root, regenerate types after changing `backend/shared/powersync-reference-write-api.openapi.yaml`:
 
 ```bash
 pnpm --dir backend generate-types

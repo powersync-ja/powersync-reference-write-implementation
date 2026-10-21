@@ -1,6 +1,6 @@
 # Updating the single-file connector
 
-Use this prompt when the modular connector, its helpers, or `backend/powersync-reference-write-api.openapi.yaml`
+Use this prompt when the modular connector, its helpers, or `backend/shared/powersync-reference-write-api.openapi.yaml`
 changes. This file is a maintenance reference; no tooling runs it automatically.
 
 ## Regeneration prompt
@@ -12,7 +12,7 @@ Regenerate `example-client/src/PowersyncConnector.singlefile.ts` from:
 - `example-client/src/library/powersync/OpenAPITransport.ts`
 - `example-client/src/library/powersync/DemoConnectorConfig.ts`
 - `example-client/src/library/powersync/TransactionBatching.ts`
-- `backend/powersync-reference-write-api.openapi.yaml`
+- `backend/shared/powersync-reference-write-api.openapi.yaml`
 
 Preserve the modular connector's runtime behavior and follow these requirements:
 
@@ -58,4 +58,4 @@ Keep runtime checks for malformed responses and the `completeAcceptedPrefix` beh
 by default. Complete the accepted prefix even when a callback fails, and never complete
 past a retained transaction or malformed result.
 
-Keep both connector versions covered by `backend/connector.test.ts`.
+Keep both connector versions covered by `backend/shared/test/connector.test.ts`.
