@@ -38,6 +38,7 @@ Preserve the modular connector's runtime behavior and follow these requirements:
     Include the setup links because users may copy the file without its README.
 11. Preserve the methods and override points: `uploadData`, `fetchCredentials`,
     `getBatchingConfig`, `onFatalTransaction`, `onRetryableError`, and `onTransportError`.
+    The modular `getRetryConfig()` becomes the `RETRY_*` constants.
     Keep shared behavior documented consistently in both connector versions.
 
 Write comments that explain behavior, configuration, or constraints. Avoid repeated
