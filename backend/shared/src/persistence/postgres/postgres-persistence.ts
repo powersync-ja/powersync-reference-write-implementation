@@ -112,6 +112,9 @@ export const createPostgresPersister = (
   const persister = {
     /** Closes the pool. Only needed where the process does not exit, such as tests. */
     end: () => pool.end(),
+    ping: async () => {
+      await pool.query('SELECT 1');
+    },
     updateBatch: async (batch: CrudEntry[], auth: AuthContext) => {
       let client: PG.PoolClient;
       try {

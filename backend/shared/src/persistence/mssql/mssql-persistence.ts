@@ -57,6 +57,9 @@ export const createMSSQLPersister = async (uri: string, mapper: EntryMapper = de
   await pool.connect();
 
   const persister: Persister = {
+    ping: async () => {
+      await pool.request().query('SELECT 1');
+    },
     // This adapter does not use auth yet. Add application permission checks in authorize(),
     // or check existing rows within this database transaction.
     updateBatch: async (batch: CrudEntry[], _auth: AuthContext) => {

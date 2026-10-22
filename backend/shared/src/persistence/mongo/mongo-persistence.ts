@@ -18,6 +18,9 @@ export const createMongoPersister = async (uri: string, mapper?: EntryMapper): P
   const resolvedMapper = mapper ?? createMongoMapper(schema!);
 
   const persister: Persister = {
+    ping: async () => {
+      await db.command({ ping: 1 });
+    },
     // This adapter does not use auth yet. Add application permission checks in authorize(),
     // or check existing rows within this database transaction.
     updateBatch: async (batch: CrudEntry[], _auth: AuthContext) => {
