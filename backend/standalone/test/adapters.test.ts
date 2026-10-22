@@ -82,7 +82,10 @@ vi.mock('mongodb', () => ({
     }
   }
 }));
-vi.mock('../../shared/src/persistence/mongo/mongo-schema.ts', () => ({ discoverSchema: db.schema }));
+vi.mock('../../shared/src/persistence/mongo/mongo-schema.ts', () => ({
+  discoverCollections: async () => ({ schema: await db.schema(), idConverters: {} }),
+  convertId: (_converters: unknown, _table: string, id: string) => id
+}));
 vi.mock('../src/persistence/persister.ts', () => ({ getPersister: async () => ({ updateBatch: db.persist }) }));
 vi.mock('../src/auth/authorizer.ts', () => ({ authorizer: { authorize: () => true } }));
 vi.mock('../src/auth/verifier.ts', () => ({ verifier: { verify: async () => ({ sub: 'verified', claims: {} }) } }));
@@ -284,7 +287,10 @@ describe.each(['postgres', 'mysql', 'mssql', 'mongodb'])('%s identifier validati
       batchOnFatalError: () => 'stop'
     });
     const [result] = await process([{ transaction_id: 1, crud: [batch[0], hostile] }], auth);
-    expect(result).toMatchObject({ status: 'fatal_error', failed_operation: { error_code: 'INVALID_DATA', operation_index: 1 } });
+    expect(result).toMatchObject({
+      status: 'fatal_error',
+      failed_operation: { error_code: 'INVALID_DATA', operation_index: 1 }
+    });
     // The whole transaction is refused up front: not even the valid first operation runs.
     expect(db.operation).not.toHaveBeenCalled();
     expect(db.begin).not.toHaveBeenCalled();
