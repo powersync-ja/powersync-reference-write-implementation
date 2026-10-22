@@ -17,6 +17,23 @@ connector retains queued transactions during outages. Credential failures, const
 unknown non-transient codes remain fatal. If acquisition fails, there is no client to roll
 back or release; transaction failures still attempt rollback and release the acquired client.
 
+## Retry backoff and limit
+
+A retryable result may come from an error that will never succeed, so the example connectors
+back off and give up:
+
+- Retries use exponential backoff with jitter (default 1s base, 60s cap). `retry_after_ms`, if the
+  backend supplies it, is a minimum.
+- After 10 consecutive `retryable_error` results for the same transaction, the connector treats it as a
+  client-directed fatal error with code `RETRY_LIMIT_EXCEEDED` and calls `onFatalTransaction`.
+  The default retains it, which restarts the count; return `'complete'` to discard it.
+- Network errors, timeouts and non-2xx responses back off but never count toward the limit, so an
+  offline device keeps its queue.
+- Attempt counts are held in memory and reset when the app restarts.
+
+Tune the settings by overriding `getRetryConfig()` (modular connector) or editing the `RETRY_*`
+constants (single-file connector).
+
 The following replaces `fatalErrorHandler` in `backend/standalone/src/fatal-error-handler.ts`.
 `developerOwnedStorage` is a placeholder for your storage integration; supply its import and
 implementation. The file already declares `FatalErrorHandler`.

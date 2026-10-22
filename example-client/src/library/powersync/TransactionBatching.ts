@@ -2,6 +2,26 @@ import type { TransactionResult, ClientHandledFatalResult } from './WriteAPIClie
 
 export const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+export type RetryConfig = {
+  /** Delay before the first retry; doubles on each further attempt. */
+  baseDelayMs: number;
+  maxDelayMs: number;
+  /** Consecutive `retryable_error` results for one transaction before it is escalated as fatal. */
+  maxAttempts: number;
+};
+
+export const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  baseDelayMs: 1000,
+  maxDelayMs: 60_000,
+  maxAttempts: 10
+};
+
+/** Exponential backoff with jitter (50-100% of the capped delay). `floorMs` is a server-supplied minimum. */
+export const backoffDelayMs = (attempt: number, config: RetryConfig, floorMs = 0): number => {
+  const capped = Math.min(config.maxDelayMs, config.baseDelayMs * 2 ** (attempt - 1));
+  return Math.max(floorMs, capped / 2 + (Math.random() * capped) / 2);
+};
+
 /** Complete only the contiguous accepted prefix, even when a callback throws. */
 export async function completeAcceptedPrefix(
   batch: { complete(): Promise<void> }[],
