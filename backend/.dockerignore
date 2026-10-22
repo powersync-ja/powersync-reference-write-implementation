@@ -14,7 +14,8 @@ powersync/
 dist
 
 # Not needed at runtime.
-Dockerfile
+**/Dockerfile
 .dockerignore
 **/*.test.ts
-test-fixtures/
+**/test-fixtures/
+supabase/

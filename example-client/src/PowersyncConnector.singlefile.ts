@@ -146,7 +146,7 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
 
   /**
    * POST /api/data via plain fetch — no openapi-fetch, no generated client. Every non-2xx response
-   * this backend returns (400/401/500) is `{ message }` (see backend/powersync-reference-write-api.openapi.yaml); 401/403 become
+   * this backend returns (400/401/500) is `{ message }` (see backend/shared/powersync-reference-write-api.openapi.yaml); 401/403 become
    * an {@link AuthenticationError} so onTransportError can clear the cached token and retry.
    */
   private async postTransactionBatch(body: TransactionBatchAPI): Promise<TransactionBatchResponseAPI> {
@@ -216,7 +216,7 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
   }
 }
 
-// API types matching backend/powersync-reference-write-api.openapi.yaml. Update these when the API contract changes;
+// API types matching backend/shared/powersync-reference-write-api.openapi.yaml. Update these when the API contract changes;
 // this file does not use generated types.
 
 type CrudOp = 'PUT' | 'PATCH' | 'DELETE';
