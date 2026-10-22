@@ -7,9 +7,10 @@ client intervention and deliver backend-directed failures to your own storage or
 Authorization failures reach this handler before persistence starts. If a database transaction
 has started, its adapter attempts rollback before the failure reaches this handler.
 
-The Supabase Edge Function's default handler differs: it sends every fatal error, including
-`UNAUTHORIZED` from an RLS policy or missing grant, to `onDeadLetter`, so those writes leave the
-client queue. Change `requiresClientHandling` in its `fatal-error-handler.ts` to keep them queued.
+The Supabase Edge Function reports `UNAUTHORIZED` from an RLS policy or missing grant
+as `retryable_error`, so the write stays queued and is retried. The client can decide to
+dead-letter it after a number of retries. Change `permissionErrorsRetryable` in its `rls.ts`
+to alter this.
 
 Postgres connection acquisition failures are classified before routing. Known transient Node
 transport failures, such as `ECONNREFUSED` and `ECONNRESET`, return `retryable_error` so the
