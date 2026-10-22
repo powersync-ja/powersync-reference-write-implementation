@@ -1,0 +1,32 @@
+import app from './app.ts';
+import config from './config.ts';
+import { getPersister } from './src/persistence/persister.ts';
+import { ConfigurationError } from '../shared/src/errors.ts';
+import { initializeVerifier } from './src/auth/verifier.ts';
+import { AuthConfigurationError } from '../shared/src/auth/verifier/index.ts';
+
+const PORT = process.env.PORT || config.port;
+
+// Initialize dependencies inside the startup error boundary, before accepting any traffic.
+try {
+  void config.batchOnFatalError;
+  await initializeVerifier();
+  const persister = await getPersister();
+  await persister.ping().catch((error: unknown) => {
+    throw new ConfigurationError(
+      `Cannot connect to the database at DATABASE_URI: ${error instanceof Error ? error.message : String(error)}\n\n` +
+        `Check that the database is running and DATABASE_URI in .env is correct.`
+    );
+  });
+} catch (error) {
+  if (error instanceof ConfigurationError || error instanceof AuthConfigurationError) {
+    // Configuration errors include setup instructions; print them without a stack trace.
+    console.error(`\nCannot start.\n\n${error.message}\n`);
+    process.exit(1);
+  }
+  throw error;
+}
+
+app.listen(PORT, () => {
+  console.log(`Server is running @ http://127.0.0.1:${PORT}`);
+});
