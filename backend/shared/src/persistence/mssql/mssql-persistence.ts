@@ -94,7 +94,7 @@ export const createMSSQLPersister = async (uri: string, mapper: EntryMapper = de
               const insertClause = `WHEN NOT MATCHED THEN INSERT (${columns}) VALUES (${sourceColumns})`;
 
               const statement = `
-            MERGE INTO ${table} AS t
+            MERGE INTO ${table} WITH (HOLDLOCK) AS t
             USING (VALUES (${columnParamaters})) AS source (${columns})
               ON t.[id] = source.[id]
             ${updateClause ? updateClause : ''}
