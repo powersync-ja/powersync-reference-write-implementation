@@ -1,6 +1,6 @@
-import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.ts';
+import { ErrorCode, FatalOperationError, RetryableError, messageOf, retryUnrecognized } from '../../errors.ts';
 
-const MYSQL_ERRNOS: Record<number, ErrorCode> = {
+const FATAL_MYSQL_ERRNOS: Record<number, ErrorCode> = {
   1048: 'NOT_NULL_VIOLATION',
   1062: 'UNIQUE_VIOLATION',
   1452: 'FOREIGN_KEY_VIOLATION',
@@ -25,9 +25,9 @@ export const classifyMySQLError = (error: unknown): Error => {
   const { errno, sqlState, code } = (error as { errno?: number; sqlState?: string; code?: string }) ?? {};
   const message = messageOf(error);
 
-  const named = errno != null ? MYSQL_ERRNOS[errno] : undefined;
-  if (named) {
-    return new FatalOperationError(named, message);
+  const fatalCode = errno != null ? FATAL_MYSQL_ERRNOS[errno] : undefined;
+  if (fatalCode) {
+    return new FatalOperationError(fatalCode, message);
   }
 
   const state = sqlState ?? '';
@@ -48,5 +48,6 @@ export const classifyMySQLError = (error: unknown): Error => {
     return new RetryableError(message);
   }
 
-  return new FatalOperationError('UNCLASSIFIED_ERROR', message);
+  // Not on the fatal list: retry, and warn so the code can be reviewed.
+  return retryUnrecognized('MySQL', { errno, sqlState, code }, message);
 };

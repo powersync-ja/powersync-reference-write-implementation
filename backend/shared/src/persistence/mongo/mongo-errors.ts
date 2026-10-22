@@ -1,6 +1,6 @@
-import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.ts';
+import { ErrorCode, FatalOperationError, RetryableError, messageOf, retryUnrecognized } from '../../errors.ts';
 
-const MONGO_CODES: Record<number, ErrorCode> = {
+const FATAL_MONGO_CODES: Record<number, ErrorCode> = {
   121: 'DOCUMENT_VALIDATION_FAILURE',
   11000: 'UNIQUE_VIOLATION'
 };
@@ -18,9 +18,9 @@ export const classifyMongoError = (error: unknown): Error => {
   }
 
   const code = mongoError?.code;
-  const named = code != null ? MONGO_CODES[code] : undefined;
-  if (named) {
-    return new FatalOperationError(named, message);
+  const fatalCode = code != null ? FATAL_MONGO_CODES[code] : undefined;
+  if (fatalCode) {
+    return new FatalOperationError(fatalCode, message);
   }
 
   // No error code at all is typical of driver/network-level failures (MongoNetworkError,
@@ -29,5 +29,6 @@ export const classifyMongoError = (error: unknown): Error => {
     return new RetryableError(message);
   }
 
-  return new FatalOperationError('UNCLASSIFIED_ERROR', message);
+  // Not on the fatal list: retry, and warn so the code can be reviewed.
+  return retryUnrecognized('MongoDB', { code }, message);
 };
