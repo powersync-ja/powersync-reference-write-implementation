@@ -81,7 +81,7 @@ describe('createTransactionProcessor', () => {
     ]);
   });
 
-  it('rejects unsafe client names after authorization and before creating the persister', async () => {
+  it('rejects unsafe client names before authorization and before creating the persister', async () => {
     const authorize = vi.fn().mockReturnValue(true);
     const persister = vi.fn();
     const { process } = setup({ authorizer: { authorize }, persister, batchOnFatalError: () => 'stop' });
@@ -94,7 +94,7 @@ describe('createTransactionProcessor', () => {
       status: 'fatal_error',
       failed_operation: { error_code: 'INVALID_DATA', operation_index: 1 }
     });
-    expect(authorize).toHaveBeenCalledOnce();
+    expect(authorize).not.toHaveBeenCalled();
     expect(persister).not.toHaveBeenCalled();
   });
 

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { collectionSchemaFromJsonSchema } from '../src/persistence/mongo/mongo-schema.ts';
+import { ObjectId } from 'mongodb';
+import {
+  collectionSchemaFromJsonSchema,
+  convertId,
+  idConverterFromJsonSchema
+} from '../src/persistence/mongo/mongo-schema.ts';
 import { createMongoMapper } from '../src/mapping/mongo.ts';
 import { FatalOperationError } from '../src/errors.ts';
 import type { CrudEntry } from '../src/types.ts';
@@ -69,5 +74,29 @@ describe('mongo mapper with Zod schemas', () => {
       expect((error as FatalOperationError).errorCode).toBe('INVALID_DATA');
       expect((error as FatalOperationError).details).toBeTruthy();
     }
+  });
+});
+
+describe('mongo _id conversion', () => {
+  const withId = (bsonType: unknown) =>
+    idConverterFromJsonSchema({ bsonType: 'object', properties: { _id: { bsonType } } });
+  const convert = (bsonType: unknown, id: string) => convertId({ t: withId(bsonType) }, 't', id);
+  const hex = '507f1f77bcf86cd799439011';
+
+  it('converts ObjectId strings', () => {
+    expect(convert('objectId', hex)).toEqual(new ObjectId(hex));
+  });
+
+  it('rejects malformed ObjectId strings as INVALID_DATA', () => {
+    expect(() => convert('objectId', 'nope')).toThrow(FatalOperationError);
+  });
+
+  it('keeps string ids and converts integer ids', () => {
+    expect(convert('string', 'a')).toBe('a');
+    expect(convert('int', '42')).toBe(42);
+  });
+
+  it.each([[undefined], [['objectId', 'string']], ['uuid']])('refuses to start with _id type %j', (t) => {
+    expect(() => withId(t)).toThrow(/_id/);
   });
 });
