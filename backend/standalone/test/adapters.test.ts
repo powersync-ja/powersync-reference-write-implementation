@@ -125,10 +125,10 @@ describe('Postgres connection recovery', () => {
       expect(db.release).not.toHaveBeenCalled();
     }
   );
-  it('keeps bad credentials fatal on acquisition', async () => {
+  it('retries bad credentials on acquisition, since an operator can fix them', async () => {
     db.connect.mockRejectedValueOnce(Object.assign(new Error('bad credentials'), { code: '28P01' }));
     const persister = createPostgresPersister('postgres://user:pass@localhost:5432/db');
-    await expect(persister.updateBatch(batch, auth)).rejects.toMatchObject({ errorCode: 'UNCLASSIFIED_ERROR' });
+    await expect(persister.updateBatch(batch, auth)).rejects.toBeInstanceOf(RetryableError);
     expect(db.release).not.toHaveBeenCalled();
   });
   it('rolls back and releases when the connection resets during commit', async () => {

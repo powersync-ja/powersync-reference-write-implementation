@@ -1,4 +1,4 @@
-import { FatalOperationError } from '../../errors.ts';
+import { FatalOperationError, connectionFailure } from '../../errors.ts';
 import { assertNoQuoteCharacters } from '../identifiers.ts';
 import { URL } from 'url';
 import sql from 'mssql';
@@ -66,7 +66,10 @@ export const createMSSQLPersister = async (uri: string, mapper: EntryMapper = de
       const transaction = pool.transaction();
       try {
         await transaction.begin();
-
+      } catch (error) {
+        throw connectionFailure(error);
+      }
+      try {
         for (const [operationIndex, op] of batch.entries()) {
           try {
             const mapped = mapper(op);

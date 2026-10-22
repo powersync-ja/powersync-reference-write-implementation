@@ -15,6 +15,13 @@ export class RetryableError extends Error {
   }
 }
 
+/**
+ * A failure to obtain a database connection (network, DNS, TLS, credentials, unknown database).
+ * These are environment faults rather than problems with the data, so they are always retryable:
+ * the client keeps the transaction queued until an operator fixes the environment.
+ */
+export const connectionFailure = (error: unknown): RetryableError => new RetryableError(messageOf(error));
+
 export type ErrorCode =
   | 'NOT_NULL_VIOLATION'
   | 'UNIQUE_VIOLATION'

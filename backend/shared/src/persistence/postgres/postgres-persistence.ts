@@ -1,4 +1,4 @@
-import { FatalOperationError } from '../../errors.ts';
+import { FatalOperationError, connectionFailure } from '../../errors.ts';
 import { assertNoQuoteCharacters } from '../identifiers.ts';
 import PG from 'pg';
 import type { AuthContext, Persister, CrudEntry } from '../../types.ts';
@@ -120,7 +120,7 @@ export const createPostgresPersister = (
       try {
         client = await pool.connect();
       } catch (error) {
-        throw classifyPostgresError(error);
+        throw connectionFailure(error);
       }
       // Set when rollback fails; the connection's state is unknown, so it is discarded.
       let discard: Error | undefined;

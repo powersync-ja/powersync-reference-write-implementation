@@ -5,6 +5,10 @@ const MONGO_CODES: Record<number, ErrorCode> = {
   11000: 'UNIQUE_VIOLATION'
 };
 
+// AuthenticationFailed surfaces on the first operation of a pooled connection, so it is a
+// connection-time fault rather than a problem with the data.
+const MONGO_AUTHENTICATION_FAILED = 18;
+
 export const classifyMongoError = (error: unknown): Error => {
   if (error instanceof FatalOperationError || error instanceof RetryableError) return error;
   const mongoError = error as { code?: number; hasErrorLabel?: (label: string) => boolean } | null | undefined;
@@ -18,6 +22,7 @@ export const classifyMongoError = (error: unknown): Error => {
   }
 
   const code = mongoError?.code;
+  if (code === MONGO_AUTHENTICATION_FAILED) return new RetryableError(message);
   const named = code != null ? MONGO_CODES[code] : undefined;
   if (named) {
     return new FatalOperationError(named, message);

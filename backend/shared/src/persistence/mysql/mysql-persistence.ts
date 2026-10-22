@@ -1,4 +1,4 @@
-import { FatalOperationError } from '../../errors.ts';
+import { FatalOperationError, connectionFailure } from '../../errors.ts';
 import { assertNoQuoteCharacters } from '../identifiers.ts';
 import mysql from 'mysql2/promise';
 import type { AuthContext, Persister, CrudEntry } from '../../types.ts';
@@ -28,7 +28,7 @@ export const createMySQLPersister = (uri: string, mapper: EntryMapper = defaultM
       try {
         connection = await pool.getConnection();
       } catch (error) {
-        throw classifyMySQLError(error);
+        throw connectionFailure(error);
       }
       try {
         await connection.beginTransaction();
