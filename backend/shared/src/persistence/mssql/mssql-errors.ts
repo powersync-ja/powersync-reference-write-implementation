@@ -1,6 +1,6 @@
-import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.ts';
+import { ErrorCode, FatalOperationError, RetryableError, messageOf, retryUnrecognized } from '../../errors.ts';
 
-const MSSQL_NUMBERS: Record<number, ErrorCode> = {
+const FATAL_MSSQL_NUMBERS: Record<number, ErrorCode> = {
   515: 'NOT_NULL_VIOLATION',
   547: 'CONSTRAINT_VIOLATION',
   2601: 'UNIQUE_VIOLATION',
@@ -28,9 +28,9 @@ export const classifyMSSQLError = (error: unknown): Error => {
   const { number, code } = (error as { number?: number; code?: string }) ?? {};
   const message = messageOf(error);
 
-  const named = number != null ? MSSQL_NUMBERS[number] : undefined;
-  if (named) {
-    return new FatalOperationError(named, message);
+  const fatalCode = number != null ? FATAL_MSSQL_NUMBERS[number] : undefined;
+  if (fatalCode) {
+    return new FatalOperationError(fatalCode, message);
   }
 
   if (number != null && RETRYABLE_MSSQL_NUMBERS.has(number)) {
@@ -40,5 +40,6 @@ export const classifyMSSQLError = (error: unknown): Error => {
     return new RetryableError(message);
   }
 
-  return new FatalOperationError('UNCLASSIFIED_ERROR', message);
+  // Not on the fatal list: retry, and warn so the code can be reviewed.
+  return retryUnrecognized('MSSQL', { number, code }, message);
 };

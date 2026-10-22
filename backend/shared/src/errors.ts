@@ -42,6 +42,15 @@ export class FatalOperationError extends Error {
   }
 }
 
+/**
+ * Classifiers treat only an explicit list of codes as fatal; anything else is retried. Warn on
+ * the fallthrough so unrecognized codes can be reviewed and added to the fatal list if permanent.
+ */
+export const retryUnrecognized = (database: string, detail: Record<string, unknown>, message: string): RetryableError => {
+  console.warn(`Unrecognized ${database} error treated as retryable:`, detail, message);
+  return new RetryableError(message);
+};
+
 export const messageOf = (error: unknown): string => {
   const message = (error as { message?: unknown })?.message;
   return typeof message === 'string' ? message : String(error);

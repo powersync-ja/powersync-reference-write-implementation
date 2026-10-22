@@ -213,7 +213,8 @@ components:
             identify more precisely; INVALID_DATA is a value that cannot be
             stored in the column, e.g. malformed or out of range;
             UNAUTHORIZED is a rejected authorization check;
-            UNCLASSIFIED_ERROR is an error the backend didn't recognize.
+            UNCLASSIFIED_ERROR is a non-database error the backend didn't recognize;
+            unrecognized database errors are returned as retryable_error instead.
         message:
           type: string
           description: Human-readable error detail.

@@ -14,9 +14,22 @@ to alter this.
 
 Postgres connection acquisition failures are classified before routing. Known transient Node
 transport failures, such as `ECONNREFUSED` and `ECONNRESET`, return `retryable_error` so the
-connector retains queued transactions during outages. Credential failures, constraints and
-unknown non-transient codes remain fatal. If acquisition fails, there is no client to roll
+connector retains queued transactions during outages. Constraint, invalid-data and
+schema errors remain fatal. If acquisition fails, there is no client to roll
 back or release; transaction failures still attempt rollback and release the acquired client.
+
+## Retryable errors
+
+Each database adapter has an explicit list of permanent failures (constraint violations, invalid
+data, schema mismatches, authorization, and database-specific codes such as MongoDB `121` and
+`11000`). Every other database error is returned as `retryable_error`, and the backend logs a
+`console.warn` with the raw driver code. Review those warnings and add codes that turn out to be
+permanent to the adapter's `*-errors.ts` file. Errors raised outside the database (for example
+a bug in a mapper) are still fatal with `UNCLASSIFIED_ERROR`.
+
+Because the backend may retry an error that will never succeed, a client should back off and
+eventually give up on a transaction that keeps returning `retryable_error`. The example
+connectors do not do this yet.
 
 The following replaces `fatalErrorHandler` in `backend/standalone/src/fatal-error-handler.ts`.
 `developerOwnedStorage` is a placeholder for your storage integration; supply its import and

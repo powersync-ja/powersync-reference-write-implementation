@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { classifyPostgresError } from '../src/persistence/postgres/postgres-errors.ts';
 import { FatalOperationError, RetryableError } from '../src/errors.ts';
 
@@ -24,10 +24,16 @@ describe('Postgres error classification', () => {
     ['23505', 'UNIQUE_VIOLATION'],
     ['42501', 'UNAUTHORIZED'],
     ['42P01', 'SCHEMA_MISMATCH'],
-    ['28P01', 'UNCLASSIFIED_ERROR'],
-    ['UNKNOWN_DRIVER_ERROR', 'UNCLASSIFIED_ERROR']
+    ['23001', 'CONSTRAINT_VIOLATION'],
+    ['22003', 'INVALID_DATA']
   ])('keeps permanent failure %s fatal', (code, errorCode) => {
     expect(classifyPostgresError({ code, message: 'permanent failure' })).toMatchObject({ errorCode });
+  });
+  it.each(['28P01', 'XX000', 'UNKNOWN_DRIVER_ERROR'])('retries unrecognized code %s and warns', (code) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(classifyPostgresError({ code, message: 'unknown failure' })).toBeInstanceOf(RetryableError);
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
   });
   it('preserves already classified application errors', () => {
     for (const error of [new RetryableError('retry'), new FatalOperationError('CUSTOM', 'reject')]) {

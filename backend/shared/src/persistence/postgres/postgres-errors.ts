@@ -1,6 +1,6 @@
-import { ErrorCode, FatalOperationError, RetryableError, messageOf } from '../../errors.ts';
+import { ErrorCode, FatalOperationError, RetryableError, messageOf, retryUnrecognized } from '../../errors.ts';
 
-const POSTGRES_CODES: Record<string, ErrorCode> = {
+const FATAL_POSTGRES_CODES: Record<string, ErrorCode> = {
   '23502': 'NOT_NULL_VIOLATION',
   '23503': 'FOREIGN_KEY_VIOLATION',
   '23505': 'UNIQUE_VIOLATION',
@@ -12,9 +12,9 @@ export const classifyPostgresError = (error: unknown): Error => {
   const code = (error as { code?: string })?.code ?? '';
   const message = messageOf(error);
 
-  const named = POSTGRES_CODES[code];
-  if (named) {
-    return new FatalOperationError(named, message);
+  const fatalCode = FATAL_POSTGRES_CODES[code];
+  if (fatalCode) {
+    return new FatalOperationError(fatalCode, message);
   }
   if (code.startsWith('23')) {
     return new FatalOperationError('CONSTRAINT_VIOLATION', message);
@@ -30,18 +30,16 @@ export const classifyPostgresError = (error: unknown): Error => {
     return new FatalOperationError('SCHEMA_MISMATCH', message);
   }
 
-  // Node transport errors carry non-SQLSTATE codes. Retry only known transient codes;
-  // unknown driver errors still follow the existing fatal classification below.
-  const networkCodes = new Set([
+  // Node transport errors carry non-SQLSTATE codes.
+  const retryableNetworkCodes = new Set([
     'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE',
     'EHOSTUNREACH', 'ENETUNREACH', 'ENETDOWN', 'ENOTFOUND', 'EAI_AGAIN'
   ]);
-  if (networkCodes.has(code)) return new RetryableError(message);
+  if (retryableNetworkCodes.has(code)) return new RetryableError(message);
 
   // Class 08 (connection), 40 (transaction rollback: deadlock/serialization failure), 53
   // (insufficient resources), 57/58 (admin shutdown/system error), or no SQLSTATE at all (raw
-  // driver/network error, e.g. connection reset): known-transient buckets, kept retryable.
-  // Everything else unrecognized is treated as fatal below rather than retried forever.
+  // driver/network error, e.g. connection reset): known transient.
   if (
     code === '' ||
     code.startsWith('08') ||
@@ -53,5 +51,6 @@ export const classifyPostgresError = (error: unknown): Error => {
     return new RetryableError(message);
   }
 
-  return new FatalOperationError('UNCLASSIFIED_ERROR', message);
+  // Not on the fatal list: retry, and warn so the code can be reviewed.
+  return retryUnrecognized('Postgres', { code }, message);
 };
