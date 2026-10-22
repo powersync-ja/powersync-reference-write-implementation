@@ -2,6 +2,7 @@ import config from '../../config.ts';
 import { fatalErrorHandler, notifyDeadLetter, type FatalErrorContext } from '../fatal-error-handler.ts';
 import express, { type Request, type Response } from 'express';
 import { getPersister } from '../persistence/persister.ts';
+import { assertSafeTransaction } from '../persistence/identifiers.ts';
 import { authorizer } from '../auth/authorizer.ts';
 import { FatalOperationError, RetryableError } from '../errors.ts';
 import type { AuthContext } from '../auth/types.ts';
@@ -17,6 +18,8 @@ const applyTransaction = async (
   auth: AuthContext
 ): Promise<TransactionResult> => {
   try {
+    // Validate client-supplied identifiers before any custom code sees them, including the authorizer.
+    assertSafeTransaction(transaction.crud);
     const allowed = await authorizer.authorize(transaction.crud, auth);
     if (!allowed) {
       throw new FatalOperationError('UNAUTHORIZED', 'Not authorized to apply this transaction');
