@@ -52,16 +52,11 @@ create policy "Owners manage their lists" on public.lists
 ```
 
 > [!WARNING]
-> A write that a policy or missing grant denies returns a fatal `UNAUTHORIZED` result for the
-> whole transaction, and by default the write is discarded. The client drops it from its upload
-> queue, the next sync replaces the user's local change with the server's data, and only
-> `onDeadLetter` in `fatal-error-handler.ts` records it. A mistake in a policy or grant therefore
-> loses user writes without an error the user sees. Test your policies before deploying, and send
-> `onDeadLetter` somewhere you monitor.
->
-> The Express backend instead keeps `UNAUTHORIZED` queued by default. Keeping it
-> queued preserves the change but blocks that user's later uploads until it is handled. To
-> choose that, change `requiresClientHandling` in `fatal-error-handler.ts`; see
+> A write that a policy or missing grant denies returns `retryable_error` for the whole
+> transaction. The client keeps it queued and retries, so a mistake in a policy or grant does not
+> lose user writes, but it blocks that user's later uploads until the write succeeds. Have the
+> client's `uploadData` give up after a number of retries and dead-letter or discard the
+> transaction. The Express backend instead returns a fatal `UNAUTHORIZED` that stays queued; see
 > [error handling](../../docs/error-handling.md).
 >
 > PATCH and DELETE of a row that RLS hides from the user succeed without changing anything; see
@@ -178,7 +173,7 @@ Edit these files in `backend/supabase/functions/powersync-write/`:
 | --- | --- |
 | `mapper.ts` | Map client tables and columns; see [schema mapping](../../docs/schema-mapping.md) |
 | `authorizer.ts` | Optional checks before each transaction; RLS is the primary authorization (see [Authorization](#authorization)) |
-| `fatal-error-handler.ts` | Route permanent failures; see [error handling](../../docs/error-handling.md). By default every fatal error, including `UNAUTHORIZED`, leaves the client queue. `onDeadLetter` is awaited before the response |
+| `fatal-error-handler.ts` | Route permanent failures; see [error handling](../../docs/error-handling.md). By default every fatal error leaves the client queue. RLS and grant denials are retryable and never reach it. `onDeadLetter` is awaited before the response |
 | `config.ts` | Batch policy (`stop`/`skip`), per-worker pool limits, and the statement timeout |
 
 Redeploy after editing.
@@ -205,7 +200,7 @@ the statement timeout from `config.ts` inside each transaction.
 
 PATCH and DELETE that match no visible row succeed without changing anything, the same as
 the Express backend. A row hidden by RLS counts as no match. A write that violates a policy or
-lacks a grant returns a fatal `UNAUTHORIZED` result. Client table and column names must be plain
+lacks a grant returns a `retryable_error` result. Client table and column names must be plain
 identifiers, the same as for the Express backend; see
 [identifier validation](../../docs/schema-mapping.md#identifier-validation).
 

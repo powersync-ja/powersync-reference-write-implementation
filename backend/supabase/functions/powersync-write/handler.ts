@@ -6,7 +6,7 @@ import { authorizer } from './authorizer.ts';
 import { batchOnFatalError, pool, readConfig } from './config.ts';
 import { fatalErrorHandler } from './fatal-error-handler.ts';
 import { mapper } from './mapper.ts';
-import { asAuthenticatedUser } from './rls.ts';
+import { asAuthenticatedUser, permissionErrorsRetryable } from './rls.ts';
 
 /** Matches /<function-name>/api/data, so connectors use the function URL as their backend URL. */
 const DATA_PATH = /^\/[^/]+\/api\/data\/?$/;
@@ -16,10 +16,12 @@ const message = (status: number, text: string) => Response.json({ message: text 
 let processor: TransactionProcessor | undefined;
 const getProcessor = (): TransactionProcessor => {
   if (!processor) {
-    const persister = createPostgresPersister(readConfig().databaseUrl, mapper, {
-      pool,
-      initializeTransaction: asAuthenticatedUser
-    });
+    const persister = permissionErrorsRetryable(
+      createPostgresPersister(readConfig().databaseUrl, mapper, {
+        pool,
+        initializeTransaction: asAuthenticatedUser
+      })
+    );
     processor = createTransactionProcessor({
       persister: () => persister,
       authorizer,

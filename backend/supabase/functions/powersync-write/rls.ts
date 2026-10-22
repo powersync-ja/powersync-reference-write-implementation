@@ -1,6 +1,7 @@
 import type PG from 'pg';
 import { setJwtClaims } from '@powersync/write-core/persistence/postgres/postgres-persistence.ts';
-import type { AuthContext } from '@powersync/write-core/types.ts';
+import { FatalOperationError, RetryableError } from '@powersync/write-core/errors.ts';
+import type { AuthContext, Persister } from '@powersync/write-core/types.ts';
 
 /**
  * Applies Supabase RLS for the verified caller inside the current database transaction.
@@ -12,4 +13,22 @@ import type { AuthContext } from '@powersync/write-core/types.ts';
 export async function asAuthenticatedUser(client: PG.PoolClient, auth: AuthContext): Promise<void> {
   await setJwtClaims(client, auth);
   await client.query('SET LOCAL ROLE authenticated');
+}
+
+/**
+ * Reports a denied write (a missing grant or an RLS policy, classified as UNAUTHORIZED) as
+ * retryable, so the client keeps the transaction queued instead of losing it. A policy or grant
+ * can be fixed after the fact; the client decides when to give up and dead-letter the write.
+ */
+export function permissionErrorsRetryable(persister: Persister): Persister {
+  return {
+    async updateBatch(batch, auth) {
+      try {
+        await persister.updateBatch(batch, auth);
+      } catch (e) {
+        if (e instanceof FatalOperationError && e.errorCode === 'UNAUTHORIZED') throw new RetryableError(e.message);
+        throw e;
+      }
+    }
+  };
 }

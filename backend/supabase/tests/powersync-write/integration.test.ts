@@ -36,18 +36,16 @@ Deno.test({
 
       // Upsert onto B's row: the conflicting row fails the UPDATE policy.
       let res = await post(a.token, batch([put('lists', list, { name: 'taken' })]));
-      assertEquals(res.body.results[0].status, 'fatal_error');
-      assertEquals(res.body.results[0].failed_operation.error_code, 'UNAUTHORIZED');
-      assertEquals(res.body.results[0].failed_operation.operation_index, 0);
+      assertEquals(res.body.results[0].status, 'retryable_error');
 
       // Insert into B's list: the new row fails WITH CHECK.
       res = await post(a.token, batch([put('todos', id(), { list_id: list, description: 'sneaky' })]));
-      assertEquals(res.body.results[0].failed_operation.error_code, 'UNAUTHORIZED');
+      assertEquals(res.body.results[0].status, 'retryable_error');
 
       // Claiming B as owner of a new row fails WITH CHECK.
       const forged = id();
       res = await post(a.token, batch([put('lists', forged, { name: 'forged', owner_id: b.id })]));
-      assertEquals(res.body.results[0].failed_operation.error_code, 'UNAUTHORIZED');
+      assertEquals(res.body.results[0].status, 'retryable_error');
       assertEquals(await listRow(forged), undefined);
 
       // PATCH and DELETE of an invisible row affect nothing and succeed.
