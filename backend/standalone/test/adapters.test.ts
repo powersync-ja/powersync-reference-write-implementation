@@ -70,7 +70,7 @@ vi.mock('mongodb', () => ({
   MongoClient: class {
     async connect() {}
     db() {
-      return { collection: () => ({ replaceOne: db.operation, updateOne: db.operation, deleteOne: db.operation }) };
+      return { collection: () => ({ updateOne: db.operation, deleteOne: db.operation }) };
     }
     startSession() {
       return {

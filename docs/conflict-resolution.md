@@ -33,8 +33,6 @@ Behaviour is the same on Postgres, MySQL, and MSSQL unless stated otherwise.
 - Row missing: inserted (this is the delete-resurrection case).
 - Row exists: columns present in the `PUT` are overwritten, others left untouched.
 
-**MongoDB differs**: `replaceOne` replaces the whole document, so fields not in the `PUT` are dropped.
-
 ### `PATCH`: update existing row only
 
 - Row missing: matches zero rows, no error, no insert. This is the "delete wins" path.
@@ -65,7 +63,6 @@ These will abort the transaction and are classified as fatal or retryable errors
 - No visibility of lost writes: no audit trail, no conflict log.
 - `PUT` can resurrect deleted rows. Clients that re-insert with a known id (e.g. `INSERT OR REPLACE`) will undo another client's delete.
 - Per-column last-write-wins can produce combinations no single user intended (client A's `title` with client B's `status`).
-- MongoDB `PUT` is whole-document replace, unlike the SQL adapters.
 
 # Alternatives
 

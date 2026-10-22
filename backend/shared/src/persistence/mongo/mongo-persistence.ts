@@ -45,11 +45,10 @@ export const createMongoPersister = async (uri: string, mapper?: EntryMapper): P
             const id = convertId(idConverters, mapped.table, mapped.id) as mongo.ObjectId;
 
             if (mapped.op == 'PUT') {
-              const doc: Record<string, unknown> = { _id: id, ...mapped.data };
-              await collection.replaceOne({ _id: id }, doc, {
-                upsert: true,
-                session
-              });
+              // Upsert that overwrites only the provided fields, like the SQL adapters. $set rejects
+              // an empty document, so a PUT with no fields only ensures the document exists.
+              const update = Object.keys(mapped.data).length > 0 ? { $set: mapped.data } : { $setOnInsert: {} };
+              await collection.updateOne({ _id: id }, update, { upsert: true, session });
             } else if (mapped.op == 'PATCH') {
               await collection.updateOne({ _id: id }, { $set: mapped.data }, { session });
             } else if (mapped.op == 'DELETE') {

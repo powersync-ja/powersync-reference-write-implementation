@@ -64,7 +64,7 @@ describe.skipIf(!baseUrl)('MongoDB persister _id conversion', () => {
     await persister.updateBatch([entry('PUT', 'oid_items', hex, { id: hex, name: 'a', done: 0 })], auth);
     expect(await items.find().toArray()).toEqual([{ _id: oid, name: 'a', done: false }]);
 
-    // PUT again must replace, not duplicate.
+    // PUT again must update in place, not duplicate.
     await persister.updateBatch([entry('PUT', 'oid_items', hex, { id: hex, name: 'b', done: 1 })], auth);
     expect(await items.find().toArray()).toEqual([{ _id: oid, name: 'b', done: true }]);
 
@@ -73,6 +73,26 @@ describe.skipIf(!baseUrl)('MongoDB persister _id conversion', () => {
 
     await persister.updateBatch([entry('DELETE', 'oid_items', hex)], auth);
     expect(await items.countDocuments()).toBe(0);
+  });
+
+  it('PUT overwrites only the provided fields and keeps the rest', async () => {
+    const items = db.collection('str_items');
+    await persister.updateBatch([entry('PUT', 'str_items', 'keep', { name: 'a', done: 1 })], auth);
+    await persister.updateBatch([entry('PUT', 'str_items', 'keep', { name: 'b' })], auth);
+    expect(await items.find({ _id: 'keep' as never }).toArray()).toEqual([{ _id: 'keep', name: 'b', done: true }]);
+    await persister.updateBatch([entry('DELETE', 'str_items', 'keep')], auth);
+  });
+
+  it('PUT with no fields does not error or change an existing document', async () => {
+    const empty = (e: CrudEntry) => ({ table: e.table, op: e.op, id: e.id, data: {} });
+    const custom = await createMongoPersister(withDb(baseUrl!), empty);
+    const oid = new mongo.ObjectId(hex);
+    const items = db.collection('oid_items');
+
+    await items.insertOne({ _id: oid, name: 'x' });
+    await custom.updateBatch([entry('PUT', 'oid_items', hex)], auth);
+    expect(await items.find().toArray()).toEqual([{ _id: oid, name: 'x' }]);
+    await items.deleteOne({ _id: oid });
   });
 
   it('string and int _id collections keep working', async () => {
