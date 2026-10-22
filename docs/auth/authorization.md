@@ -20,8 +20,10 @@ export interface Authorizer {
 }
 ```
 
-`crud` contains the operations sent by the client. `auth` contains the verified token
-subject and claims: `{ sub, claims }`.
+`crud` contains the operations sent by the client. Its table names and `op_data` keys have
+already passed [identifier validation](../schema-mapping.md#identifier-validation); values have
+not, so pass them as query parameters, never interpolated into SQL. `auth` contains the verified
+token subject and claims: `{ sub, claims }`.
 
 Returning `false` rejects the whole transaction with `UNAUTHORIZED`. The default
 [fatal-error handler](../error-handling.md) treats this as client-directed: the transaction stays

@@ -32,14 +32,18 @@ export type TransactionProcessor = (transactions: TransactionBatch, auth: AuthCo
 export function createTransactionProcessor(options: TransactionProcessorOptions): TransactionProcessor {
   const applyTransaction = async (transaction: UploadedTransaction, auth: AuthContext): Promise<TransactionResult> => {
     try {
-      const allowed = await options.authorizer.authorize(transaction.crud, auth);
-      if (!allowed) {
-        throw new FatalOperationError('UNAUTHORIZED', 'Not authorized to apply this transaction');
-      }
       // Rejects unsafe client table and column names before any database work, whichever
       // persister runs. See docs/schema-mapping.md#identifier-validation.
       assertSafeTransaction(transaction.crud);
 
+      // Authorizes the transaction before applying it. This depends on
+      // application business logic and may involve checking user roles, permissions, or other criteria.
+      const allowed = await options.authorizer.authorize(transaction.crud, auth);
+      if (!allowed) {
+        throw new FatalOperationError('UNAUTHORIZED', 'Not authorized to apply this transaction');
+      }
+
+      // Applies the transaction using the persister. This is where the actual database operations occur.
       const { updateBatch } = await options.persister();
       await updateBatch(transaction.crud, auth);
       return { status: 'success' };

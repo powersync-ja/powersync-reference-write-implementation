@@ -130,4 +130,15 @@ describe('fatal routing over HTTP', () => {
       expect(handler).not.toHaveBeenCalled();
     }
   );
+
+  it('rejects unsafe identifiers before the authorizer runs', async () => {
+    vi.spyOn(fatalErrorHandler, 'onDeadLetter').mockImplementation(() => {});
+    const res = await request(app)
+      .post('/api/data')
+      .set('Authorization', 'Bearer test')
+      .send({ transactions: [{ transaction_id: 1, crud: [{ op: 'PUT', table: "items'; --", id: '1' }] }] });
+    expect(res.body.results[0].failed_operation).toMatchObject({ error_code: 'INVALID_DATA', operation_index: 0 });
+    expect(mocks.authorize).not.toHaveBeenCalled();
+    expect(mocks.updateBatch).not.toHaveBeenCalled();
+  });
 });
