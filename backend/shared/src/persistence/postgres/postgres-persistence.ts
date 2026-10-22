@@ -41,6 +41,49 @@ export const setJwtClaims = async (client: PG.PoolClient, auth: AuthContext): Pr
   await client.query('SELECT set_config($1, $2, true)', ['request.jwt.claims', JSON.stringify(auth.claims)]);
 };
 
+/**
+ * PowerSync clients store JSON as TEXT, so a json/jsonb value arrives as a string. Passing that to
+ * json_populate_record stores a JSON string scalar instead of the object. Parses string values of
+ * json/jsonb columns so they are embedded as real JSON.
+ */
+const parseJsonColumns = async (
+  client: PG.PoolClient,
+  table: string,
+  data: Record<string, unknown>,
+  cache: Map<string, Promise<Set<string>>>
+): Promise<Record<string, unknown>> => {
+  // Refuse unsafe column names before touching the database.
+  Object.keys(data).forEach(escapeIdentifier);
+
+  let columns = cache.get(table);
+  if (columns === undefined) {
+    columns = client
+      .query<{ attname: string }>(
+        `SELECT attname FROM pg_attribute
+         WHERE attrelid = $1::regclass
+           AND atttypid IN ('json'::regtype, 'jsonb'::regtype)
+           AND attnum > 0 AND NOT attisdropped`,
+        [table]
+      )
+      .then((result) => new Set(result.rows.map((row) => row.attname)));
+    cache.set(table, columns);
+  }
+  const jsonColumns = await columns;
+  if (jsonColumns.size === 0) return data;
+
+  const result = { ...data };
+  for (const column of jsonColumns) {
+    const value = result[column];
+    if (typeof value !== 'string') continue;
+    try {
+      result[column] = JSON.parse(value);
+    } catch {
+      // Not valid JSON: keep the string, which Postgres stores as a JSON string scalar.
+    }
+  }
+  return result;
+};
+
 export const createPostgresPersister = (
   uri: string,
   mapper: EntryMapper = defaultMapper,
@@ -88,6 +131,8 @@ export const createPostgresPersister = (
         // docs/auth/authorization.md.
         await initializeTransaction(client, auth);
 
+        const jsonColumnCache = new Map<string, Promise<Set<string>>>();
+
         for (const [operationIndex, op] of batch.entries()) {
           try {
             const mapped = mapper(op);
@@ -96,9 +141,12 @@ export const createPostgresPersister = (
             const table = escapeIdentifier(mapped.table);
 
             if (mapped.op == 'PUT') {
-              const with_id = { ...mapped.data, id: mapped.id };
+              const payload = {
+                ...(await parseJsonColumns(client, table, mapped.data, jsonColumnCache)),
+                id: mapped.id
+              };
 
-              const columnsEscaped = Object.keys(with_id).map(escapeIdentifier);
+              const columnsEscaped = Object.keys(payload).map(escapeIdentifier);
               const columnsJoined = columnsEscaped.join(', ');
 
               const updateClauses: string[] = [];
@@ -121,9 +169,12 @@ export const createPostgresPersister = (
                 SELECT ${columnsJoined} FROM data_row
                 ON CONFLICT(id) ${updateClause}`;
 
-              await client.query(statement, [JSON.stringify(with_id)]);
+              await client.query(statement, [JSON.stringify(payload)]);
             } else if (mapped.op == 'PATCH') {
-              const with_id = { ...mapped.data, id: mapped.id };
+              const payload = {
+                ...(await parseJsonColumns(client, table, mapped.data, jsonColumnCache)),
+                id: mapped.id
+              };
 
               const updateClauses: string[] = [];
 
@@ -144,7 +195,7 @@ export const createPostgresPersister = (
                 SET ${updateClauses.join(', ')}
                 FROM data_row
                 WHERE ${table}.id = data_row.id`;
-              await client.query(statement, [JSON.stringify(with_id)]);
+              await client.query(statement, [JSON.stringify(payload)]);
             } else if (mapped.op == 'DELETE') {
               const statement = `
                 WITH data_row AS (
