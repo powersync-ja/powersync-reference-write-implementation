@@ -11,7 +11,7 @@ const transactions = [1, 2].map((id) => ({
 const setup = (overrides: Partial<TransactionProcessorOptions> = {}) => {
   const updateBatch = vi.fn().mockRejectedValueOnce(new FatalOperationError('CHECK_VIOLATION', 'bad', undefined, 0));
   const process = createTransactionProcessor({
-    persister: () => ({ updateBatch }),
+    persister: () => ({ updateBatch, ping: async () => {} }),
     authorizer: { authorize: () => true },
     fatalErrorHandler: { requiresClientHandling: () => false, onDeadLetter: () => {} },
     batchOnFatalError: () => 'skip',

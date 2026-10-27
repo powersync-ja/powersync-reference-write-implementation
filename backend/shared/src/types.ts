@@ -46,6 +46,8 @@ export interface Authorizer {
 
 export interface Persister {
   updateBatch: (batch: CrudEntry[], auth: AuthContext) => Promise<void>;
+  /** Resolves if the database answers a trivial query; rejects otherwise. Used at startup and by the health check. */
+  ping: () => Promise<void>;
 }
 
 export type PersisterFactory = (uri: string, mapper?: EntryMapper) => Persister | Promise<Persister>;

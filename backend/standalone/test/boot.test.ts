@@ -4,6 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import net from 'node:net';
 
 /**
  * Tests startup failures in a separate process. Invalid configuration should produce
@@ -66,6 +67,32 @@ const bootWith = (env: Record<string, string>): Promise<Boot> =>
     });
   });
 
+/**
+ * Answers the Postgres wire protocol just enough to accept a connection and run `SELECT 1`,
+ * so startup can verify the database without a real server.
+ */
+const message = (type: string, body: Buffer = Buffer.alloc(0)) => {
+  const header = Buffer.alloc(5);
+  header.write(type, 0);
+  header.writeInt32BE(body.length + 4, 1);
+  return Buffer.concat([header, body]);
+};
+const startFakePostgres = () =>
+  new Promise<net.Server>((resolve) => {
+    const server = net.createServer((socket) => {
+      socket.on('error', () => {});
+      socket.on('data', (data) => {
+        if (data[0] === 'Q'.charCodeAt(0)) {
+          socket.write(Buffer.concat([message('C', Buffer.from('SELECT 1\0')), message('Z', Buffer.from('I'))]));
+        } else {
+          const authOk = Buffer.alloc(4);
+          socket.write(Buffer.concat([message('R', authOk), message('Z', Buffer.from('I'))]));
+        }
+      });
+    });
+    server.listen(0, '127.0.0.1', () => resolve(server));
+  });
+
 describe('refusing to start on bad configuration', () => {
   it.each([
     ['missing.json', 'Cannot read'],
@@ -88,11 +115,25 @@ describe('refusing to start on bad configuration', () => {
     expect(output).not.toMatch(/^\s+at .+/m);
   });
 
-  it('starts with the test auth configuration without fetching remote keys', async () => {
-    const { output, stillRunning } = await bootWith({
-      DATABASE_URI: 'postgres://u:p@127.0.0.1:5432/test',
+  it('refuses to start when the database cannot be reached', async () => {
+    const { code, output, stillRunning } = await bootWith({
+      DATABASE_URI: 'postgres://u:p@127.0.0.1:1/test',
       DATABASE_TYPE: 'postgres'
     });
+    expect(stillRunning).toBe(false);
+    expect(code).toBe(1);
+    expect(output).toContain('Cannot start.');
+    expect(output).toContain('DATABASE_URI');
+    expect(output).not.toMatch(/^\s+at .+/m);
+  }, 40000);
+
+  it('starts with the test auth configuration without fetching remote keys', async () => {
+    const database = await startFakePostgres();
+    const { port } = database.address() as net.AddressInfo;
+    const { output, stillRunning } = await bootWith({
+      DATABASE_URI: `postgres://u:p@127.0.0.1:${port}/test`,
+      DATABASE_TYPE: 'postgres'
+    }).finally(() => database.close());
     expect(stillRunning).toBe(true);
     expect(output).toContain('Server is running');
     expect(output).not.toContain('Cannot start.');

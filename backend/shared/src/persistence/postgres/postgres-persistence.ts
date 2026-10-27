@@ -1,4 +1,4 @@
-import { FatalOperationError } from '../../errors.ts';
+import { FatalOperationError, connectionFailure } from '../../errors.ts';
 import { assertNoQuoteCharacters } from '../identifiers.ts';
 import PG from 'pg';
 import type { AuthContext, Persister, CrudEntry } from '../../types.ts';
@@ -112,12 +112,15 @@ export const createPostgresPersister = (
   const persister = {
     /** Closes the pool. Only needed where the process does not exit, such as tests. */
     end: () => pool.end(),
+    ping: async () => {
+      await pool.query('SELECT 1');
+    },
     updateBatch: async (batch: CrudEntry[], auth: AuthContext) => {
       let client: PG.PoolClient;
       try {
         client = await pool.connect();
       } catch (error) {
-        throw classifyPostgresError(error);
+        throw connectionFailure(error);
       }
       // Set when rollback fails; the connection's state is unknown, so it is discarded.
       let discard: Error | undefined;

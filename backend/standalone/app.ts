@@ -5,6 +5,7 @@ import * as OpenApiValidator from 'express-openapi-validator';
 import { postTransactionBatch } from './src/api/data.ts';
 import { requireAuth } from './src/auth/middleware.ts';
 import { verifier } from './src/auth/verifier.ts';
+import { getPersister } from './src/persistence/persister.ts';
 import logRequest from './src/middleware/logger.ts';
 import type { Request, Response, NextFunction } from 'express';
 
@@ -33,13 +34,19 @@ app.use(
     apiSpec: path.join(__dirname, '../shared/powersync-reference-write-api.openapi.yaml'),
     validateRequests: true,
     validateResponses: false,
-    // The liveness probe is outside the OpenAPI contract.
+    // The health check is outside the OpenAPI contract.
     ignorePaths: /^\/$/
   })
 );
 
-app.get('/', (_req: Request, res: Response) => {
-  res.status(200).send({ message: 'backend' });
+app.get('/', async (_req: Request, res: Response) => {
+  try {
+    await (await getPersister()).ping();
+    res.status(200).send({ message: 'backend' });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    res.status(503).send({ message: 'database unavailable' });
+  }
 });
 
 app.post('/api/data', postTransactionBatch);

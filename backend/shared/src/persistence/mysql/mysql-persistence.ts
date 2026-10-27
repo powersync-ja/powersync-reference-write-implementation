@@ -1,4 +1,4 @@
-import { FatalOperationError } from '../../errors.ts';
+import { FatalOperationError, connectionFailure } from '../../errors.ts';
 import { assertNoQuoteCharacters } from '../identifiers.ts';
 import mysql from 'mysql2/promise';
 import type { AuthContext, Persister, CrudEntry } from '../../types.ts';
@@ -20,8 +20,16 @@ export const createMySQLPersister = (uri: string, mapper: EntryMapper = defaultM
   const persister: Persister = {
     // This adapter does not use auth yet. Add application permission checks in authorize(),
     // or check existing rows within this database transaction.
+    ping: async () => {
+      await pool.query('SELECT 1');
+    },
     updateBatch: async (batch: CrudEntry[], _auth: AuthContext) => {
-      const connection = await pool.getConnection();
+      let connection: Awaited<ReturnType<typeof pool.getConnection>>;
+      try {
+        connection = await pool.getConnection();
+      } catch (error) {
+        throw connectionFailure(error);
+      }
       try {
         await connection.beginTransaction();
 

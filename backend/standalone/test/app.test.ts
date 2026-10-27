@@ -15,6 +15,9 @@ vi.mock('../src/auth/verifier.ts', () => ({
   }
 }));
 
+const persister = vi.hoisted(() => ({ ping: vi.fn() }));
+vi.mock('../src/persistence/persister.ts', () => ({ getPersister: async () => persister }));
+
 import app from '../app.ts';
 
 /**
@@ -23,10 +26,21 @@ import app from '../app.ts';
  * An unreadable spec therefore breaks both the root route and request validation.
  */
 describe('the assembled application', () => {
-  it('serves its root route', async () => {
+  it('serves its root route when the database answers', async () => {
+    persister.ping.mockResolvedValue(undefined);
+
     const response = await request(app).get('/');
 
     expect(response.status).toBe(200);
+    expect(persister.ping).toHaveBeenCalled();
+  });
+
+  it('reports the root route unhealthy when the database does not answer', async () => {
+    persister.ping.mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+    const response = await request(app).get('/');
+
+    expect(response.status).toBe(503);
   });
 
   it('rejects a request that violates the OpenAPI contract', async () => {

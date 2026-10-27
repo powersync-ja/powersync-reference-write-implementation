@@ -10,8 +10,14 @@ const PORT = process.env.PORT || config.port;
 // Initialize dependencies inside the startup error boundary, before accepting any traffic.
 try {
   void config.batchOnFatalError;
-  await getPersister();
   await initializeVerifier();
+  const persister = await getPersister();
+  await persister.ping().catch((error: unknown) => {
+    throw new ConfigurationError(
+      `Cannot connect to the database at DATABASE_URI: ${error instanceof Error ? error.message : String(error)}\n\n` +
+        `Check that the database is running and DATABASE_URI in .env is correct.`
+    );
+  });
 } catch (error) {
   if (error instanceof ConfigurationError || error instanceof AuthConfigurationError) {
     // Configuration errors include setup instructions; print them without a stack trace.
