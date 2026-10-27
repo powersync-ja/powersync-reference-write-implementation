@@ -1,5 +1,5 @@
 /**
- * The backend cannot start because of invalid configuration.
+ * The selected backend cannot start because of invalid configuration.
  * The message should explain how to fix it.
  */
 export class ConfigurationError extends Error {

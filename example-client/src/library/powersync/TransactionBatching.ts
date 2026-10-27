@@ -35,7 +35,7 @@ export async function completeAcceptedPrefix(
           });
           if (decision !== 'complete') throw new Error('Fatal transaction retained for client handling');
           boundary = index;
-          // Client-directed failures always end the backend batch. Never complete a later result.
+          // Client-directed failures always end batch processing in either backend. Never complete a later result.
           return;
         }
         boundary = index;

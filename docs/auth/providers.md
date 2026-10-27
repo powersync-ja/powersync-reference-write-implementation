@@ -1,9 +1,9 @@
 # Supabase and Clerk
 
-Backend settings that are specific to these providers. For everything else, see
+Express backend settings that are specific to these providers. For everything else, see
 [auth setup](setup.md).
 
-In the connector you copied, return the provider's token from the private `fetchAuthToken()`
+In the client connector you copied, return the provider's token from the private `fetchAuthToken()`
 method, which supplies both writes and `fetchCredentials()` (sync). Provider SDKs manage their
 own sessions, so you can drop the demo token cache in `getAuthToken()`. If sync and
 writes use different tokens, both must carry the same user ID in `sub`.
@@ -18,12 +18,13 @@ issuer, audience and JWKS URL are derived for standard hosted projects; a custom
 Legacy HS256 secrets are rejected. Migrate to
 [Supabase signing keys](https://supabase.com/docs/guides/auth/signing-keys) and re-export.
 
-The Express backend does not write as the Supabase user, so policies that use `auth.uid()` or
-`auth.jwt()` do not apply to its writes, and it usually connects as a role that bypasses RLS.
-Authorize in its [authorization hook](authorization.md) instead. If your data lives in Supabase
-Postgres and you rely on RLS, deploy the write API as the
-[Supabase Edge Function](../../backend/supabase/README.md) instead. It needs no auth settings and
-applies your existing RLS policies to each write.
+The Express backend's Postgres adapter exposes the verified token claims through
+`request.jwt.claims`, which Supabase's `auth.uid()` and `auth.jwt()` helpers can read. It does
+not switch database roles: RLS applies only when the connection role is subject to RLS and
+the policies apply to that role. See [Postgres row-level security](authorization.md#postgres-row-level-security).
+The [Supabase Edge Function](../../backend/supabase/README.md) additionally switches to the
+`authenticated` role, so it can use the grants and RLS policies configured for signed-in
+Supabase users. It needs none of the Express backend's authentication settings.
 
 ## Clerk
 
@@ -40,7 +41,7 @@ AUTH_AUDIENCE=<the template's aud>
 AUTH_JWKS_URI=https://<your-frontend-api>.clerk.accounts.dev/.well-known/jwks.json
 ```
 
-**A session token** has no `aud`. The backend instead checks `azp`, the origin of the app that
+**A session token** has no `aud`. The Express backend instead checks `azp`, the origin of the app that
 obtained the token. You still need a template token for sync.
 
 ```dotenv

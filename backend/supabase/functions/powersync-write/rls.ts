@@ -17,8 +17,8 @@ export async function asAuthenticatedUser(client: PG.PoolClient, auth: AuthConte
 
 /**
  * Reports a denied write (a missing grant or an RLS policy, classified as UNAUTHORIZED) as
- * retryable, so the client keeps the transaction queued instead of losing it. A policy or grant
- * can be fixed after the fact; the client decides when to give up and dead-letter the write.
+ * retryable, so the client connector keeps the transaction queued instead of losing it. A policy or grant
+ * can be fixed after the fact; your app decides when to give up and dead-letter the write.
  */
 export function permissionErrorsRetryable(persister: Persister): Persister {
   return {

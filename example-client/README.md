@@ -1,18 +1,17 @@
 # Example client
 
-Copy one of these TypeScript connectors into an existing PowerSync application. This directory
-has no package manifest or runnable UI. It sends local transactions to the write API; the
+Copy one of these TypeScript client connectors into your PowerSync app. This directory
+has no package manifest or runnable UI. Each client connector sends local transactions to the write API; the
 PowerSync SDK handles the separate sync connection.
 
-## Choose a connector
+## Choose a client connector
 
 | Version | Files to copy | Dependencies |
 | --- | --- | --- |
 | Modular | `src/PowersyncConnector.ts`, `src/library/powersync/`, and `src/generated/api.d.ts` | PowerSync SDK, `openapi-fetch`, `uuid` |
 | Single file | `src/PowersyncConnector.singlefile.ts` | PowerSync SDK |
 
-Both versions require `@powersync/web` or `@powersync/react-native` >=1.26.0 for
-`getCrudTransactions()`. Change the SDK import for React Native.
+For React Native, change the SDK import from `@powersync/web` to `@powersync/react-native`.
 
 Both demos use browser `localStorage` for a demo user ID. Replace that persistence on platforms
 without it. The single-file version also needs `crypto.randomUUID()` or a platform UUID generator.
@@ -23,13 +22,13 @@ existing PowerSync schema or adapt it to match the source database and sync conf
 
 ## Configure and connect
 
-The modular connector reads these variables through `import.meta.env`. Adapt
+The modular client connector reads these variables through `import.meta.env`. Adapt
 `DemoConnectorConfig.ts` if your bundler exposes configuration differently:
 
 | Variable | Meaning |
 | --- | --- |
 | `VITE_BACKEND_URL` | Write API base URL without a trailing slash, e.g. `http://localhost:6060` |
-| `VITE_POWERSYNC_URL` | Actual PowerSync sync endpoint |
+| `VITE_POWERSYNC_URL` | Your PowerSync instance URL |
 | `VITE_POWERSYNC_TOKEN` | Demo token for sync and writes; replace `fetchAuthToken()` in real apps |
 | `VITE_BATCH_MAX_TRANSACTIONS` | Transactions per request; use 1–50 (default 1) |
 | `VITE_BATCH_MAX_OPERATIONS` | Operation threshold for collecting transactions (default 1000) |
@@ -37,10 +36,10 @@ The modular connector reads these variables through `import.meta.env`. Adapt
 
 See [.env.example](.env.example). Batching is enabled only when `VITE_BATCH_MAX_TRANSACTIONS`
 is a positive integer; `VITE_BATCH_MAX_OPERATIONS` is then optional. Otherwise the connector
-uploads one transaction per request. The API rejects batches larger than 50 transactions. The operation threshold can be exceeded
+uploads one transaction per request. The write API rejects batches larger than 50 transactions. The operation threshold can be exceeded
 by the last transaction collected because the connector does not split transactions.
 
-The single-file connector uses constants at the top instead of environment variables.
+The single-file client connector uses constants at the top instead of environment variables.
 Set its URLs, batch thresholds, and timeout there.
 
 After adapting authentication, connect your initialized PowerSync database:
@@ -56,8 +55,9 @@ import path. `fetchCredentials()` supplies the sync token; `uploadData()` sends 
 
 ## Authentication
 
-The backend does not issue tokens. It accepts tokens signed by the provider your PowerSync
-instance trusts. The demo `fetchAuthToken()` returns a fixed token (`VITE_POWERSYNC_TOKEN`, or
+Neither backend issues tokens. Configure the Express backend to trust your token provider,
+or use Supabase Auth with the Supabase Edge Function. Your PowerSync instance must trust
+the tokens used for sync. The demo `fetchAuthToken()` returns a fixed token (`VITE_POWERSYNC_TOKEN`, or
 `AUTH_TOKEN` in the single-file connector), such as a session token copied from your provider.
 Both sync and writes reuse it.
 
@@ -74,7 +74,7 @@ expired token. For Supabase, see
 
 ## Rejected writes
 
-Both connectors expose `onFatalTransaction`, which returns `'retain'` or `'complete'` for
+Both client connectors expose `onFatalTransaction`, which returns `'retain'` or `'complete'` for
 client-directed failures. The default retains the transaction and blocks later uploads.
 See [error handling](../docs/error-handling.md) before implementing release or replacement.
 

@@ -99,7 +99,7 @@ export function uriList(value: unknown): string[] | undefined {
   return undefined;
 }
 
-/** Reads replacement JWKS URLs reachable from this backend. */
+/** Reads replacement JWKS URLs reachable from the Express backend. */
 export function overrideUris(supplements: AuthSupplements, diagnostics: Diagnostics): string[] | undefined {
   if (supplements.jwksUriOverride === undefined) return undefined;
   const uris = uriList(supplements.jwksUriOverride);

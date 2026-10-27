@@ -6,12 +6,12 @@
 > [Supabase authorization](../../backend/supabase/README.md#authorization).
 
 Authentication identifies the caller. Authorization determines which writes the
-caller may make. The default authorizer allows all authenticated writes.
+caller may make. The Express backend's default authorizer allows all authenticated writes.
 
 ## Authorization hook
 
 `backend/standalone/src/auth/authorizer.ts` exports an `Authorizer` (the interface is defined in
-`backend/shared/src/types.ts`), called once per transaction by the transaction processor
+`backend/shared/src/types.ts`), called once per transaction by the shared core's transaction processor
 (`backend/shared/src/write/processor.ts`) before persistence:
 
 ```ts
@@ -20,7 +20,7 @@ export interface Authorizer {
 }
 ```
 
-`crud` contains the operations sent by the client. Its table names and `op_data` keys have
+`crud` contains the operations sent by the client connector. Its table names and `op_data` keys have
 already passed [identifier validation](../schema-mapping.md#identifier-validation); values have
 not, so pass them as query parameters, never interpolated into SQL. `auth` contains the verified
 token subject and claims: `{ sub, claims }`.
@@ -82,11 +82,12 @@ await client.query('SELECT set_config($1, $2, true)', ['request.jwt.claims', JSO
 ```
 
 The `true` argument scopes the setting to that transaction. This is the convention PostgREST
-(v10 and later) and Supabase use, so policies written for them work unchanged. Your row-level
+(v10 and later) and Supabase use, so compatible policies can read the same claims. The connection role must also be subject
+to RLS and covered by those policies. Your row-level
 security policies can read the subject with
 `current_setting('request.jwt.claims', true)::json->>'sub'`, or any other claim the same way.
 
-**N.B. This backend sets the
+**N.B. The Express backend sets the
 identity value but does not create policies.** You must define and enable policies for your schema and database role.
 
 Plain Postgres has no `auth.uid()` function; that is a Supabase helper. You can define your own
@@ -116,9 +117,9 @@ so standard Supabase policies using `auth.uid()` apply. See
 - **Cover every operation the connector issues.** PUT is an upsert, so it needs
   `INSERT` and `UPDATE` policies. PATCH needs `UPDATE`, and DELETE needs `DELETE`.
   Include `WITH CHECK` so writes cannot assign rows to another user.
-- **Coming from PostgREST.** This backend sets the single JSON value that PostgREST v10 and
+- **Coming from PostgREST.** The Express backend sets the single JSON value that PostgREST v10 and
   later use. Policies written for older versions, which read per-claim settings such as
-  `request.jwt.claim.sub`, need updating. This backend does not switch roles, so connect as a
+  `request.jwt.claim.sub`, need updating. The Express backend does not switch roles, so connect as a
   role that has the table grants and is subject to RLS, not as PostgREST's `authenticator`
   login role, which typically has no table grants of its own.
 

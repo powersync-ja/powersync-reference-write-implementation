@@ -74,7 +74,7 @@ export interface IWriteAPIClient {
   processTransactionBatch(transactions: CrudTransaction[]): Promise<TransactionBatchResult>;
 }
 
-/** Converts an SDK transaction to the API request format. */
+/** Converts an SDK transaction to the write API request format. */
 const toApiTransaction = (transaction: CrudTransaction): CrudTransaction_API => ({
   crud: transaction.crud.map((op: SDKCrudEntry) => ({
     id: op.id,
@@ -109,7 +109,7 @@ export class WriteAPIClient implements IWriteAPIClient {
   constructor(private options: WriteAPIClientOptions) {}
 
   /**
-   * Uploads complete transactions in one request. The backend processes them in order,
+   * Uploads complete transactions in one request. Both backends process them in order,
    * each in its own database transaction, and returns one result per transaction.
    */
   async processTransactionBatch(transactions: CrudTransaction[]): Promise<TransactionBatchResult> {

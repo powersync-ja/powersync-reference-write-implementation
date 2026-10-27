@@ -15,7 +15,7 @@ export interface paths {
         put?: never;
         /**
          * Apply one or more transactions, each in its own database transaction
-         * @description Applies each transaction in order, each in its own database transaction. Stops at failures unless the backend BATCH_ON_FATAL_ERROR setting is skip and the failure is backend-directed.
+         * @description Applies each transaction in order, each in its own database transaction. Stops at failures unless the selected backend's BATCH_ON_FATAL_ERROR setting is skip and the failure is backend-directed.
          *     To upload one transaction, send a transactions array containing one entry.
          *     The results array contains one entry per transaction, in request order.
          */
@@ -108,7 +108,7 @@ export interface components {
             message?: string;
         };
         FailedOperation: {
-            /** @description Machine-readable classification, backend-specific. CONSTRAINT_VIOLATION is a constraint the backend could not identify more precisely; INVALID_DATA is a value that cannot be stored in the column, e.g. malformed or out of range; UNAUTHORIZED is a rejected authorization check; UNCLASSIFIED_ERROR is an error the backend didn't recognize. */
+            /** @description Machine-readable classification, backend-specific. CONSTRAINT_VIOLATION is a constraint the selected backend could not identify more precisely; INVALID_DATA is a value that cannot be stored in the column, e.g. malformed or out of range; UNAUTHORIZED is a rejected authorization check; UNCLASSIFIED_ERROR is an error the selected backend didn't recognize. */
             error_code: string;
             /** @description Human-readable error detail. */
             message?: string;

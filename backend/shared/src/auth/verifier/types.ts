@@ -12,7 +12,7 @@ export interface AuthSupplements {
   supabaseUrl?: string;
   jwksUri?: string;
   /**
-   * Replaces the configured JWKS URIs when the backend reaches the key service at a
+   * Replaces the configured JWKS URIs when the Express backend reaches the key service at a
    * different address. This override may differ from the exported configuration.
    */
   jwksUriOverride?: string | string[];

@@ -1,4 +1,4 @@
-// PowerSync Reference Write Implementation — single-file connector
+// PowerSync Reference Write Implementation — single-file client connector
 //
 // Copy this file into your app to upload queued transactions with plain fetch.
 // It requires @powersync/web or @powersync/react-native >=1.26.0 for getCrudTransactions().
@@ -22,7 +22,7 @@ import type { AbstractPowerSyncDatabase, CrudEntry, CrudTransaction, PowerSyncBa
 /** Base URL of your write API, e.g. `http://localhost:6060` in local dev. */
 const BACKEND_URL = 'http://localhost:6060';
 
-/** Your PowerSync instance's sync endpoint. */
+/** Your PowerSync instance URL. */
 const POWERSYNC_URL = '';
 
 /**
@@ -121,7 +121,7 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
   }
 
   /**
-   * Handles a backend `retryable_error` result. Waits for retryAfterMs, if supplied,
+   * Handles a write API `retryable_error` result. Waits for retryAfterMs, if supplied,
    * then throws so PowerSync retains the transaction and retries the upload.
    * Overrides must also throw to keep the transaction queued.
    */
@@ -133,7 +133,7 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
   /**
    * Handles network errors, timeouts, and non-2xx responses through {@link onRetryableError}.
    * Clears the cached token on {@link AuthenticationError} so the next upload fetches a new one.
-   * Override to handle transport failures separately from backend retryable results.
+   * Override to handle transport failures separately from write API retryable results.
    */
   protected async onTransportError(error: unknown): Promise<never> {
     if (error instanceof AuthenticationError) {
@@ -146,7 +146,7 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
 
   /**
    * POST /api/data via plain fetch — no openapi-fetch, no generated client. Every non-2xx response
-   * this backend returns (400/401/500) is `{ message }` (see backend/shared/powersync-reference-write-api.openapi.yaml); 401/403 become
+   * the write API returns (400/401/500) is `{ message }` (see backend/shared/powersync-reference-write-api.openapi.yaml); 401/403 become
    * an {@link AuthenticationError} so onTransportError can clear the cached token and retry.
    */
   private async postTransactionBatch(body: TransactionBatchAPI): Promise<TransactionBatchResponseAPI> {
@@ -277,7 +277,7 @@ interface TransactionBatchResponseAPI {
   results: TransactionResponseAPI[];
 }
 
-/** `{ message }` — the shape of every non-2xx response this backend returns (400/401/500). */
+/** `{ message }` — the shape of every non-2xx response the write API returns (400/401/500). */
 interface MessageResponseAPI {
   message: string;
 }
@@ -298,7 +298,7 @@ type ClientHandledFatalResult = Extract<TransactionResult, { status: 'fatal_erro
   requiresClientHandling: true;
 };
 
-/** Thrown when the backend rejects a request as unauthenticated/unauthorized (401/403). */
+/** Thrown when the write API rejects a request as unauthenticated/unauthorized (401/403). */
 class AuthenticationError extends Error {
   constructor(message: string) {
     super(message);
@@ -341,7 +341,7 @@ async function completeAcceptedPrefix(
           });
           if (decision !== 'complete') throw new Error('Fatal transaction retained for client handling');
           boundary = index;
-          // Client-directed failures always end the backend batch. Never complete a later result.
+          // Client-directed failures always end batch processing in either backend. Never complete a later result.
           return;
         }
         boundary = index;

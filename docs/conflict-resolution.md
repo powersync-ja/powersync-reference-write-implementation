@@ -1,12 +1,12 @@
 # Conflict resolution
 
-How this backend resolves conflicts between client writes today. This applies to the Express
-backend and the Supabase Edge Function, which share the same transaction processor and Postgres
+How both backends resolve conflicts between writes from apps today. This applies to the Express
+backend and the Supabase Edge Function, which use the shared core's transaction processor and Postgres
 adapter. On Supabase, a row hidden by RLS counts as a row that does not exist.
 
 ## Summary
 
-The backend has **no conflict detection**. It applies each uploaded operation to the source database in the order received. 
+Both backends have **no conflict detection**. They apply uploaded operations to the source database in the order received.
 
 No versions, timestamps, or comparison against existing row state are used. That produces:
 
@@ -21,7 +21,7 @@ No versions, timestamps, or comparison against existing row state are used. That
 
 The summary is that "deletes win and last write wins" with two caveats:
 
-1. "Last" means **arrival order at the backend**, not the time the user made the edit.
+1. "Last" means **arrival order at the selected backend**, not the time the user made the edit.
 2. Delete wins only against `PATCH`. A `PUT` on a deleted id recreates the row.
 
 ## Per-operation behaviour
@@ -47,7 +47,7 @@ Behaviour is the same on Postgres, MySQL, and MSSQL unless stated otherwise.
 
 ## Client visibility on conflicts
 
-The client applies its writes locally first, then uploads. After upload, the next sync from the source database replaces local state with whatever the backend committed.
+Your app applies its writes locally first, then the client connector uploads them. After upload, the next sync from the source database replaces local state with whatever your selected backend committed.
 
 A losing client's edit therefore appears to "revert" once sync catches up. There is no notification that a write was lost or overwritten due to conflict.
 
@@ -80,8 +80,8 @@ PowerSync documents a set of custom conflict resolution strategies, with Postgre
 
 For collaborative documents, the page points to CRDTs.
 
-### Applying them in this backend
+### Applying them in both backends
 
-- **Metadata and previous values are dropped.** The API accepts `metadata` and `previous_values` on each `CrudEntry`, but the mappers and persisters forward only `table`, `op`, `id` and `data`. Field-level LWW, delta detection and anything comparing against previous values need those passed through first.
+- **Metadata and previous values are dropped.** The write API accepts `metadata` and `previous_values` on each `CrudEntry`, but the mappers and persisters forward only `table`, `op`, `id` and `data`. Field-level LWW, delta detection and anything comparing against previous values need those passed through first.
 - **Rejecting a write** (stale version, failed rule) maps to a `FatalOperationError`. See [error-handling.md](error-handling.md) for routing.
-- **Idempotency.** The PowerSync page recommends deduplicating by client and operation id. This backend instead relies on `PUT`, `PATCH` and `DELETE` being naturally idempotent, so any strategy added here must keep retries of an already-committed transaction safe.
+- **Idempotency.** The PowerSync page recommends deduplicating by client and operation id. Both backends instead rely on `PUT`, `PATCH` and `DELETE` being naturally idempotent, so any strategy added here must keep retries of an already-committed transaction safe.

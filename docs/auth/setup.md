@@ -1,7 +1,7 @@
 # Authentication setup
 
 Details for the auth step in the [README](../../README.md#2-configure-authentication). The
-backend gets its verification settings from a PowerSync config file (the default) or from
+Express backend gets its verification settings from a PowerSync config file (the default) or from
 environment variables alone (`AUTH_MODE=env`). Set variables in `.env` or `.env.local` (or
 `backend/.env` when running on the host).
 
@@ -11,7 +11,7 @@ verifies Supabase Auth tokens with the keys the platform provides and needs none
 ## Config file (default)
 
 The file is `backend/standalone/config/powersync-config.json`. It is either a PowerSync Cloud export or the
-`client_auth` section of a self-hosted service config; the backend recognises which from its shape.
+`client_auth` section of a self-hosted service config; the Express backend recognises which from its shape.
 Keep it out of version control: it can contain database settings and secret references. This
 repository ignores `powersync-config*.json` and excludes it from Docker images.
 
@@ -26,7 +26,7 @@ powersync fetch config --instance-id="<instance-id>" --output=json > backend/sta
 Alternatively, run `powersync link cloud --instance-id="<instance-id>"` once, then omit the
 instance flag on later exports. If your CLI also requires `--org-id` and `--project-id`, see
 `powersync fetch config --help`. Save the complete response, with its top-level `config` object,
-and re-export after changing auth settings. The backend may infer a Supabase project from the
+and re-export after changing auth settings. The Express backend may infer a Supabase project from the
 replication settings; if it does, verify separately that your PowerSync instance accepts those
 tokens too. Usual variables: `AUTH_ISSUER` and `AUTH_INSTANCE_URL`, or `AUTH_PROVIDER` /
 `AUTH_SUPABASE_URL` for Supabase on a custom domain.
@@ -48,7 +48,7 @@ marked below.
 
 ## Environment variables only
 
-Set `AUTH_MODE=env` and the backend reads no file. It suits any provider with a JWKS endpoint,
+Set `AUTH_MODE=env` and the Express backend reads no file. It suits any provider with a JWKS endpoint,
 such as Clerk, Auth0 or Supabase (see [Supabase and Clerk](providers.md)):
 
 ```sh
@@ -75,7 +75,7 @@ unset or blank means not set.
 | `AUTH_INSTANCE_URL` | Cloud export | Your PowerSync instance URL, the default audience for generic providers. The export does not contain it. |
 | `AUTH_PROVIDER=supabase`, `AUTH_SUPABASE_URL` | Cloud export | Supabase behind a custom domain, or when project detection is ambiguous. Standard hosted Supabase needs neither. |
 | `AUTH_REQUIRE_AUDIENCE`, `AUTH_AUTHORIZED_PARTIES` | `env`, self-hosted file | For tokens without `aud` (Clerk session tokens): set `AUTH_REQUIRE_AUDIENCE=false` and list the accepted `azp` origins. Dropping the audience requires the `azp` list; with an audience, the list adds a further check. |
-| `AUTH_JWKS_URI_OVERRIDE` | all | Read keys from this address instead, when the backend reaches the key endpoint differently than PowerSync does (for example a Docker network name). |
+| `AUTH_JWKS_URI_OVERRIDE` | all | Read keys from this address instead, when the Express backend reaches the key endpoint differently than PowerSync does (for example a Docker network name). |
 | `AUTH_ALLOW_LOCAL_HTTP`, `AUTH_ALLOW_INSECURE_HTTP_HOSTS` | all | Plain-HTTP key endpoints. HTTPS is required by default; `AUTH_ALLOW_LOCAL_HTTP=true` permits loopback, and other hosts must be named exactly (no wildcards). |
 | `AUTH_ALGORITHMS` | all | A narrower asymmetric allowlist than the RS/PS/ES/EdDSA default. |
 | `POWERSYNC_CONFIG_DIR` | file | Docker Compose only: host directory holding `powersync-config.json` (default `backend/standalone/config`). |

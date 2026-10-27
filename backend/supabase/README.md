@@ -1,9 +1,18 @@
 # Supabase Edge Function
 
-`backend/supabase/functions/powersync-write` serves the same write API as the Express backend from a
-Supabase Edge Function. It targets Supabase Postgres and Supabase Auth in the same project.
-It reuses the backend's transaction processor, request validator, and Postgres adapter directly
-from `backend/shared` (mapped as `@powersync/write-core/` in the function's `deno.json`), so
+For apps using PowerSync with Supabase Postgres and Supabase Auth, this Edge Function provides a
+ready-made backend for uploading local changes, with transaction processing and error handling
+built in. It applies writes using the signed-in user's existing RLS policies and runs in your
+Supabase project, without a separate Express backend.
+
+Each uploaded transaction commits or rolls back as a unit, including writes across multiple
+tables, without requiring custom Postgres RPC functions. You can also centralize validation,
+schema mapping, and additional application checks that are difficult to express in RLS, so
+changes to write processing can be deployed independently of your app.
+
+The function at `backend/supabase/functions/powersync-write` reuses the transaction
+processor, request validator, and Postgres adapter from the [shared core](../shared) in `backend/shared`
+(mapped as `@powersync/write-core/` in the function's `deno.json`), so
 deploying it needs no Node install or build.
 
 Each write runs as the signed-in user. Inside each database transaction the function sets the
@@ -53,9 +62,9 @@ create policy "Owners manage their lists" on public.lists
 
 > [!WARNING]
 > A write that a policy or missing grant denies returns `retryable_error` for the whole
-> transaction. The client keeps it queued and retries, so a mistake in a policy or grant does not
-> lose user writes, but it blocks that user's later uploads until the write succeeds. Have the
-> client's `uploadData` give up after a number of retries and dead-letter or discard the
+> transaction. The client connector keeps it queued and retries, so a mistake in a policy or grant does not
+> lose user writes, but it blocks that user's later uploads until the write succeeds. Have your
+> client connector's `uploadData` give up after a number of retries and dead-letter or discard the
 > transaction. The Express backend instead returns a fatal `UNAUTHORIZED` that stays queued; see
 > [error handling](../../docs/error-handling.md).
 >
@@ -63,7 +72,9 @@ create policy "Owners manage their lists" on public.lists
 > [Database connection](#database-connection).
 
 Use `authorizer.ts` only for checks RLS cannot express, such as rejecting a transaction based on
-which tables it touches before any write runs. RLS still applies to every write it allows.
+which tables it touches before any write runs. RLS still applies to every write it allows. A denial from this optional hook is
+backend-directed fatal by default and is removed from the queue; see
+[authorization-failure defaults](../../docs/error-handling.md#authorization-failure-defaults).
 
 ## Deploy to your project
 
@@ -123,7 +134,7 @@ https://<project-ref>.supabase.co/functions/v1/powersync-write
 Send the user's Supabase session access token as the bearer token. API keys, anon tokens, and
 service-role tokens are rejected.
 
-Your PowerSync sync URL does not change, and your PowerSync instance must trust the same
+Your PowerSync instance URL does not change, and your PowerSync instance must trust the same
 Supabase Auth tokens; see PowerSync's
 [Supabase Auth setup](https://docs.powersync.com/configuration/auth/supabase-auth). See
 [example-client](../../example-client/README.md) for the connector settings.

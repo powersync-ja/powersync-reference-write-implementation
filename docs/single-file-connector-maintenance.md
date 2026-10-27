@@ -1,6 +1,6 @@
-# Updating the single-file connector
+# Updating the single-file client connector
 
-Use this prompt when the modular connector, its helpers, or `backend/shared/powersync-reference-write-api.openapi.yaml`
+Use this prompt when the modular client connector, its helpers, or `backend/shared/powersync-reference-write-api.openapi.yaml`
 changes. This file is a maintenance reference; no tooling runs it automatically.
 
 ## Regeneration prompt
@@ -14,7 +14,7 @@ Regenerate `example-client/src/PowersyncConnector.singlefile.ts` from:
 - `example-client/src/library/powersync/TransactionBatching.ts`
 - `backend/shared/powersync-reference-write-api.openapi.yaml`
 
-Preserve the modular connector's runtime behavior and follow these requirements:
+Preserve the modular client connector's runtime behavior and follow these requirements:
 
 1. Keep the implementation in one file, alongside the modular version.
 2. Use one import from `@powersync/web`, with React Native compatibility documented.
@@ -31,7 +31,7 @@ Preserve the modular connector's runtime behavior and follow these requirements:
 7. Keep `AppSchema.ts` separate from the connector.
 8. Implement transport as a private connector method. Do not add a transport injection layer.
 9. Omit the unused `clientId` request option and the modular `_writeClient` cache.
-   The single-file connector calls its own transport method. Preserve any future
+   The single-file client connector calls its own transport method. Preserve any future
    behavior that depends on the client ID.
 10. Keep a concise header covering dependencies, editable constants, demo token setup,
     write API verification, PowerSync JWKS configuration, and identity-provider integration.

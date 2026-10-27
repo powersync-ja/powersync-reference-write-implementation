@@ -18,7 +18,7 @@ Development tokens are signed with a PowerSync-hosted key that is published at:
 https://powersync-api.journeyapps.com/jwks/<instance id>.json
 ```
 
-Configure the backend in [`AUTH_MODE=env`](setup.md#environment-variables-only) with:
+Configure the Express backend in [`AUTH_MODE=env`](setup.md#environment-variables-only) with:
 
 ```dotenv
 AUTH_MODE=env
@@ -27,7 +27,7 @@ AUTH_AUDIENCE=https://<instance id>.powersync.journeyapps.com
 AUTH_JWKS_URI=https://powersync-api.journeyapps.com/jwks/<instance id>.json
 ```
 
-Restart the backend after changing these.
+Restart the Express backend after changing these.
 
 ## 3. Use the token
 

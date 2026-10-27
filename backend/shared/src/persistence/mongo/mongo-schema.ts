@@ -121,7 +121,7 @@ export function convertId(converters: Record<string, IdConverter>, table: string
 /**
  * Reads collection schemas and `_id` converters from $jsonSchema validators at startup.
  * Collections without a validator are omitted; the default persister rejects writes to them.
- * Restart the backend after changing validators to refresh these.
+ * Restart the Express backend after changing validators to refresh these.
  */
 export async function discoverCollections(
   db: Db

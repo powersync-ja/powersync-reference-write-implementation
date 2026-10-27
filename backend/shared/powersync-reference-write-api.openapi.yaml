@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
-  title: PowerSync Backend API
-  description: Contract between the demo app connector and the backend.
+  title: PowerSync Write API
+  description: Write API contract between the client connector and either the Express backend or the Supabase Edge Function.
   version: 1.0.0
 
 servers:
@@ -17,7 +17,7 @@ paths:
         - bearerAuth: []
       description: >
         Applies each transaction in order, each in its own database transaction.
-        Stops at failures unless the backend BATCH_ON_FATAL_ERROR setting is skip and the failure is backend-directed.
+        Stops at failures unless the selected backend's BATCH_ON_FATAL_ERROR setting is skip and the failure is backend-directed.
 
         To upload one transaction, send a transactions array containing one entry.
 
@@ -64,7 +64,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Bearer JWT authenticating the writer to the backend.
+      description: Bearer JWT authenticating the writer to the write API.
 
   schemas:
     CrudTransaction:
@@ -209,11 +209,11 @@ components:
           type: string
           description: >
             Machine-readable classification, backend-specific.
-            CONSTRAINT_VIOLATION is a constraint the backend could not
+            CONSTRAINT_VIOLATION is a constraint the selected backend could not
             identify more precisely; INVALID_DATA is a value that cannot be
             stored in the column, e.g. malformed or out of range;
             UNAUTHORIZED is a rejected authorization check;
-            UNCLASSIFIED_ERROR is an error the backend didn't recognize.
+            UNCLASSIFIED_ERROR is an error the selected backend didn't recognize.
         message:
           type: string
           description: Human-readable error detail.

@@ -113,7 +113,7 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
   }
 
   /**
-   * Handles a backend `retryable_error` result. Waits for retryAfterMs, if supplied,
+   * Handles a write API `retryable_error` result. Waits for retryAfterMs, if supplied,
    * then throws so PowerSync retains the transaction and retries the upload.
    * Overrides must also throw to keep the transaction queued.
    */
@@ -125,7 +125,7 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
   /**
    * Handles network errors, timeouts, and non-2xx responses through {@link onRetryableError}.
    * Clears the cached token on {@link AuthenticationError} so the next upload fetches a new one.
-   * Override to handle transport failures separately from backend retryable results.
+   * Override to handle transport failures separately from write API retryable results.
    */
   protected async onTransportError(error: unknown): Promise<never> {
     if (error instanceof AuthenticationError) {

@@ -1,14 +1,14 @@
 # Fatal errors and developer-managed dead letters
 
-Every fatal error defaults to backend handling, except `UNAUTHORIZED`, which stays queued on the
-client so a denied write is not lost. Replace the methods on
+In the Express backend, every fatal error defaults to backend handling except `UNAUTHORIZED`,
+which stays queued in your app so a denied write is not lost. Replace the methods on
 `fatalErrorHandler` in `backend/standalone/src/fatal-error-handler.ts` to choose which errors need
 client intervention and deliver backend-directed failures to your own storage or service.
 Authorization failures reach this handler before persistence starts. If a database transaction
 has started, its adapter attempts rollback before the failure reaches this handler.
 
 The Supabase Edge Function reports `UNAUTHORIZED` from an RLS policy or missing grant
-as `retryable_error`, so the write stays queued and is retried. The client can decide to
+as `retryable_error`, so the write stays queued and is retried. Your app can decide to
 dead-letter it after a number of retries. Change `permissionErrorsRetryable` in its `rls.ts`
 to alter this.
 
@@ -52,14 +52,14 @@ throw new FatalOperationError(
 ```
 
 Codes can be any application string. `details`
-can be any JSON value; the API imposes no application-specific schema. Adapters attach the
+can be any JSON value; the write API imposes no application-specific schema. Adapters attach the
 zero-based original operation index when a particular operation fails. Transaction-level
 failures, including commit failures, have no inferred operation index. Only include details
 that the authenticated client should receive.
 
 A `DeadLetterEntry` includes a fresh occurrence ID, ISO timestamp, full original transaction,
 verified subject, code, message, optional details and operation index. The whole transaction
-is included because the API rejected it as a unit. A connection failure during commit can
+is included because the write API rejected it as a unit. A connection failure during commit can
 leave the database outcome uncertain; investigate that outcome before replaying writes.
 The occurrence ID identifies this notification attempt, not a stable transaction deduplication key.
 
@@ -73,6 +73,24 @@ is no built-in persistence, delivery retry, replay API, or deduplication. Implem
 your own service if required. The default handler logs the entry and points to this guide.
 If classification throws or returns an invalid decision, the result is retryable and the
 batch stops without sending a dead-letter notification.
+
+## Authorization-failure defaults
+
+These defaults differ by deployment and by where authorization fails:
+
+| Failure | API outcome | Client queue behavior |
+| --- | --- | --- |
+| Express backend `UNAUTHORIZED` failure | Client-directed `fatal_error` | Retained; blocks later uploads until resolved |
+| Supabase Edge Function RLS or missing-grant error during persistence | `retryable_error` | Retained and retried; blocks later uploads |
+| Supabase Edge Function optional custom authorizer returns `false` | Backend-directed `fatal_error` | Removed from the queue; default dead-letter handler logs it |
+
+The Supabase permission-error wrapper catches errors inside persistence only. A custom
+`authorizer` denial happens before persistence and reaches the function's fatal-error handler,
+which defaults to backend handling. Customize that handler if these denials should require
+client intervention. Neither deployment provides durable dead-letter storage by default.
+
+A PATCH or DELETE targeting a row hidden by RLS can succeed without changing a row. That is
+not a permission error; see [Supabase database connection](../backend/supabase/README.md#database-connection).
 
 ## Response and queue behavior
 
@@ -88,12 +106,13 @@ and `operation_index`. Success, retryable and not-attempted results do not carry
 | Retryable | Stop | Retain and retry |
 | Not attempted | No execution | Retain |
 
-Configure `BATCH_ON_FATAL_ERROR=stop` (default) or `skip` on the backend. This setting
-applies only to backend-directed fatal failures; client-directed and retryable failures
-always stop the batch. Restart the backend after changing it (recreate the container when
-using Docker Compose). The client cannot override this policy.
+For the Express backend, set `BATCH_ON_FATAL_ERROR=stop` (default) or `skip`, then restart it
+(recreate the container when using Docker Compose). For the Supabase Edge Function, edit
+`batchOnFatalError` in `backend/supabase/functions/powersync-write/config.ts` and redeploy.
+This policy applies only to backend-directed fatal failures; client-directed and retryable
+failures always stop the batch. The client connector cannot override it.
 
-Both example connectors expose the same hook. Override it in a subclass or edit your copied
+Both client connectors expose the same hook. Override it in a subclass or edit your copied
 connector. `CrudTransaction` comes from the PowerSync SDK; `ClientHandledFatalResult` is exported
 by the modular `WriteAPIClient.ts` and declared locally in the single-file connector:
 

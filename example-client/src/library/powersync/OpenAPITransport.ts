@@ -8,7 +8,7 @@ export interface OpenAPIClient {
 
 export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
-/** Thrown when the backend rejects a request as unauthenticated/unauthorized (401/403). */
+/** Thrown when the write API rejects a request as unauthenticated/unauthorized (401/403). */
 export class AuthenticationError extends Error {
   constructor(message: string) {
     super(message);

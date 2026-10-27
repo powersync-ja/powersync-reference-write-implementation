@@ -14,7 +14,7 @@ as the second argument to the persister factory:
 createPostgresPersister(uri, myCustomMapper);
 ```
 
-The factories are configured in `backend/standalone/src/persistence/persister-factories.ts`.
+The Express backend's factories are configured in `backend/standalone/src/persistence/persister-factories.ts`.
 
 ## Row ID
 
@@ -27,11 +27,10 @@ change to the persister under `backend/shared/src/persistence/<database>/`.
 
 ## Identifier validation
 
-Before any persister or mapper runs, the transaction processor
+Before any persister or mapper runs, the shared core's transaction processor
 (`backend/shared/src/write/processor.ts`) checks the client-supplied table name and each `op_data` key
 against `^[A-Za-z_][A-Za-z0-9_]*$` (at most 63 characters; see
-`backend/shared/src/persistence/identifiers.ts`). This applies to every backend, including the
-Supabase Edge Function and any persister you install. A name that fails, such as `my-table`, `public.todos`
+`backend/shared/src/persistence/identifiers.ts`). This applies to both backends and any persister you install. A name that fails, such as `my-table`, `public.todos`
 or `$where`, rejects the transaction with an `INVALID_DATA` fatal error and the operation index.
 Rename the client table or column, or accept the plain name and map it to the real one in a
 custom mapper. Names a mapper returns are not subject to this check, so a mapper can target
@@ -57,7 +56,7 @@ needs only the changed fields. Fields the validator does not mention, and types 
 
 Row IDs are converted to the type the validator declares for `_id` (`string`, `objectId`, `int`
 or `long`), including with a custom mapper. A malformed ObjectId fails as `INVALID_DATA`. If a
-validator does not declare `_id` with one of those types, the backend refuses to start, because
+validator does not declare `_id` with one of those types, the Express backend refuses to start, because
 an unconverted string ID would silently match nothing on PATCH/DELETE and duplicate on PUT.
 
 A value that does not match, such as `'abc'` for an `int` field or `'false'` for a `bool`, fails
@@ -67,7 +66,7 @@ With the default MongoDB mapper, a write to a collection without a discovered va
 fails with `SCHEMA_MISMATCH` in the same way. A custom mapper handles its own schema mapping.
 
 Add a `$jsonSchema` validator for each collection that accepts writes through the
-default mapper. Restart the backend after adding or changing validators.
+default mapper. Restart the Express backend after adding or changing validators.
 
 ## Custom mapping
 
@@ -83,11 +82,11 @@ default mapper. Restart the backend after adding or changing validators.
 
 ### What the mapper receives and must return
 
-- `entry.table` is the **client** table name, exactly as the client's PowerSync schema and
-  sync streams name it. A sync stream can serve a source table under a different name
+- `entry.table` is the **client** table name, exactly as your app's PowerSync schema and
+  Sync Streams name it. A Sync Stream can serve a source table under a different name
   (`FROM todos AS expanded_todos`) or add alias columns (`title AS fake_title`); uploads use
   those client names, which usually do not exist in the source database.
-- `entry.op_data` holds only what the client wrote. For `PATCH` that is **only the changed
+- `entry.op_data` holds only what your app wrote. For `PATCH` that is **only the changed
   columns**, not the whole row. For `DELETE` it is absent.
 - The row ID is `entry.id` (fall back to `op_data.id`). Return it as `id` and leave it **out of
   `data`**: the SQL persisters take the ID from `mapped.id` and ignore an `id` key in `data`.
@@ -101,7 +100,7 @@ Copy the ID and field handling from `defaultMapper` instead of wrapping it: it l
 every call, which would repeat for every operation even though your mapper does map.
 
 ```ts
-// backend/standalone/src/mapping/renames.ts (Express; see below for the Edge Function)
+// backend/standalone/src/mapping/renames.ts (Express backend; see below for the Supabase Edge Function)
 import type { EntryMapper } from '../../../shared/src/mapping/types.ts';
 
 // Client table -> source table, and per-table client column -> source column.
