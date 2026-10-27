@@ -24,6 +24,8 @@ local development and tests use Node.js 24 and pnpm 9.
 
 ### 1. Configure the database
 
+Configure the connection to the source database that your PowerSync instance replicates from.
+
 Set these in `.env.local` (or the root `.env` for shared defaults) for Docker Compose:
 
 | Variable | Meaning |
@@ -39,8 +41,7 @@ as a `DATABASE_URI` with a password, in `.env.local`. This is gitignored, option
 overrides `.env`. Compose passes both files to the container, so `docker compose up` needs no extra
 flags.
 
-Use the database that your PowerSync instance already replicates. Tables and columns
-must match uploaded operations unless you add custom [schema mapping](docs/schema-mapping.md).
+Tables and columns must match uploaded operations unless you add custom [schema mapping](docs/schema-mapping.md).
 Each table also needs an `id` primary key or unique column holding the client's row ID; see
 [row ID](docs/schema-mapping.md#row-id).
 The default MongoDB mapper also requires collection `$jsonSchema` validators.
