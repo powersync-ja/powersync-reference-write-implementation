@@ -47,13 +47,18 @@ exist in the source fails as a `SCHEMA_MISMATCH` fatal error (for example
 `Table 'db.expanded_todos' doesn't exist`), reported with the failing operation's index, and the
 whole transaction is rolled back. See [error handling](error-handling.md).
 
-MongoDB uses `createMongoMapper`. At startup, `discoverSchema` reads collection
+MongoDB uses `createMongoMapper`. At startup, `discoverCollections` reads collection
 `$jsonSchema` validators through `db.listCollections()` and builds a [Zod](https://zod.dev)
 schema for each collection (`backend/shared/src/persistence/mongo/mongo-schema.ts`). The mapper validates
 each write against it and converts client values to BSON types: SQLite `0`/`1` to booleans, and
 date strings or epoch numbers to `Date`. Required fields must be present on `PUT`; `PATCH`
 needs only the changed fields. Fields the validator does not mention, and types it cannot check
 (objects, arrays, ObjectIds), pass through unchanged.
+
+Row IDs are converted to the type the validator declares for `_id` (`string`, `objectId`, `int`
+or `long`), including with a custom mapper. A malformed ObjectId fails as `INVALID_DATA`. If a
+validator does not declare `_id` with one of those types, the backend refuses to start, because
+an unconverted string ID would silently match nothing on PATCH/DELETE and duplicate on PUT.
 
 A value that does not match, such as `'abc'` for an `int` field or `'false'` for a `bool`, fails
 as an `INVALID_DATA` fatal error. The error names the offending fields in `details`.
@@ -167,7 +172,7 @@ adapter, and identifier validation still applies.
 
 ### MongoDB
 
-Passing a mapper to `createMongoPersister` skips `discoverSchema`, so your mapper must do any
+Passing a mapper to `createMongoPersister` skips `discoverCollections`, so your mapper must do any
 validation and type conversion that the default MongoDB mapper would have derived from the
 `$jsonSchema` validators. You can reuse `collectionSchemaFromJsonSchema` or write your own Zod
 schemas.

@@ -3,7 +3,7 @@ import type { AuthContext, Persister, CrudEntry } from '../../types.ts';
 import { classifyMongoError } from './mongo-errors.ts';
 import type { EntryMapper } from '../../mapping/types.ts';
 import { createMongoMapper } from '../../mapping/mongo.ts';
-import { discoverSchema, type CollectionSchema } from './mongo-schema.ts';
+import { convertId, discoverCollections } from './mongo-schema.ts';
 import { FatalOperationError, RetryableError } from '../../errors.ts';
 
 export const createMongoPersister = async (uri: string, mapper?: EntryMapper): Promise<Persister> => {
@@ -13,9 +13,10 @@ export const createMongoPersister = async (uri: string, mapper?: EntryMapper): P
   const db = client.db();
   await client.connect();
 
-  // Custom mappers handle their own schema mapping; only the default mapper needs discovery.
-  const schema: Record<string, CollectionSchema> | null = mapper ? null : await discoverSchema(db);
-  const resolvedMapper = mapper ?? createMongoMapper(schema!);
+  // Validators are always discovered: they declare each collection's _id type, which row IDs must
+  // be converted to. Only the default mapper also uses them for field validation and requires them.
+  const { schema, idConverters } = await discoverCollections(db);
+  const resolvedMapper = mapper ?? createMongoMapper(schema);
 
   const persister: Persister = {
     // This adapter does not use auth yet. Add application permission checks in authorize(),
@@ -30,7 +31,7 @@ export const createMongoPersister = async (uri: string, mapper?: EntryMapper): P
           try {
             // Reject the transaction if a collection has no discovered validator.
             // See docs/schema-mapping.md.
-            if (schema && !schema[op.table]) {
+            if (!mapper && !schema[op.table]) {
               throw new FatalOperationError(
                 'SCHEMA_MISMATCH',
                 `No MongoDB schema validator for collection "${op.table}" — transaction rejected.`
@@ -41,21 +42,17 @@ export const createMongoPersister = async (uri: string, mapper?: EntryMapper): P
             if (mapped === null) continue;
 
             const collection = db.collection(mapped.table);
+            const id = convertId(idConverters, mapped.table, mapped.id) as mongo.ObjectId;
 
             if (mapped.op == 'PUT') {
-              const doc: Record<string, unknown> = { _id: mapped.id, ...mapped.data };
-              await collection.replaceOne({ _id: mapped.id as unknown as mongo.ObjectId }, doc, {
-                upsert: true,
-                session
-              });
+              // Upsert that overwrites only the provided fields, like the SQL adapters. $set rejects
+              // an empty document, so a PUT with no fields only ensures the document exists.
+              const update = Object.keys(mapped.data).length > 0 ? { $set: mapped.data } : { $setOnInsert: {} };
+              await collection.updateOne({ _id: id }, update, { upsert: true, session });
             } else if (mapped.op == 'PATCH') {
-              await collection.updateOne(
-                { _id: mapped.id as unknown as mongo.ObjectId },
-                { $set: mapped.data },
-                { session }
-              );
+              await collection.updateOne({ _id: id }, { $set: mapped.data }, { session });
             } else if (mapped.op == 'DELETE') {
-              await collection.deleteOne({ _id: mapped.id as unknown as mongo.ObjectId }, { session });
+              await collection.deleteOne({ _id: id }, { session });
             }
           } catch (error) {
             const classified = classifyMongoError(error);
