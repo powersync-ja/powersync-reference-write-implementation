@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('uuid', () => ({ v4: () => 'test-user' }));
 vi.mock('../../../example-client/src/library/powersync/OpenAPITransport', () => ({
   AuthenticationError: class extends Error {},
@@ -122,6 +122,68 @@ for (const [name, Connector] of [
       expect(hook).not.toHaveBeenCalled();
       expect(batch[0].complete).toHaveBeenCalledOnce();
       expect(batch[2].complete).not.toHaveBeenCalled();
+    });
+    describe('retry backoff and limit', () => {
+      const retryable = { status: 'retryable_error', message: 'deadlock' };
+      afterEach(() => vi.useRealTimers());
+
+      function setup(respond: () => unknown) {
+        vi.useFakeTimers();
+        const connector = new Connector();
+        const tx = { crud: [{ id: '1', table: 'items', op: 'PUT', clientId: 7 }], complete: vi.fn(async () => {}) };
+        const hook = vi.fn(async () => 'retain');
+        Object.assign(connector, {
+          getBatchingConfig: () => ({ maxTransactions: 1, maxOperations: 100 }),
+          onFatalTransaction: hook,
+          getWriteClient: async () =>
+            new WriteAPIClient({
+              transport: { postTransactionBatch: async () => respond() },
+              userId: 'user',
+              clientId: 'client'
+            }),
+          postTransactionBatch: async () => respond()
+        });
+        const database = {
+          getClientId: async () => 'client',
+          async *getCrudTransactions() {
+            yield tx;
+          }
+        };
+        const attempt = async () => {
+          const outcome = connector.uploadData(database as any).then(
+            () => undefined,
+            (e: unknown) => e
+          );
+          await vi.advanceTimersByTimeAsync(120_000);
+          return outcome;
+        };
+        return { tx, hook, attempt };
+      }
+
+      it('uses retry_after_ms as the minimum backoff', async () => {
+        const { attempt } = setup(() => ({ results: [{ ...retryable, retry_after_ms: 90_000 }] }));
+        const spy = vi.spyOn(globalThis, 'setTimeout');
+        expect(await attempt()).toBeTruthy();
+        expect(spy.mock.calls.some(([, ms]) => ms === 90_000)).toBe(true);
+      });
+      it('escalates to onFatalTransaction at the retry limit, then restarts the count', async () => {
+        const { tx, hook, attempt } = setup(() => ({ results: [retryable] }));
+        for (let i = 0; i < 9; i++) expect(await attempt()).toBeTruthy();
+        expect(hook).not.toHaveBeenCalled();
+        expect(await attempt()).toBeTruthy();
+        expect(hook).toHaveBeenCalledOnce();
+        expect(hook.mock.calls[0][1]).toMatchObject({ failedOperation: { error_code: 'RETRY_LIMIT_EXCEEDED' } });
+        expect(tx.complete).not.toHaveBeenCalled();
+        for (let i = 0; i < 9; i++) await attempt();
+        expect(hook).toHaveBeenCalledOnce();
+      });
+      it('does not count transport errors toward the limit', async () => {
+        const { hook, attempt } = setup(() => {
+          throw new Error('offline');
+        });
+        for (let i = 0; i < 15; i++) expect(await attempt()).toBeTruthy();
+        expect(hook).not.toHaveBeenCalled();
+      });
     });
     it('retains retryable errors and their suffix', async () => {
       const { batch, error } = await upload([success, { status: 'retryable_error' }, suffix]);

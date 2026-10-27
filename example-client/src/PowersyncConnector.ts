@@ -15,7 +15,13 @@ import {
   type BatchingConfig,
   type DemoConfig
 } from './library/powersync/DemoConnectorConfig';
-import { completeAcceptedPrefix, sleep } from './library/powersync/TransactionBatching';
+import {
+  backoffDelayMs,
+  completeAcceptedPrefix,
+  DEFAULT_RETRY_CONFIG,
+  sleep,
+  type RetryConfig
+} from './library/powersync/TransactionBatching';
 
 export class PowersyncConnector implements PowerSyncBackendConnector {
   // Called by PowerSync to upload queued local changes to the write API.
@@ -40,6 +46,11 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
   private _clientId: string | null;
   private _writeClient: WriteAPIClient | null;
   private _authToken: string | null;
+  // Consecutive failed uploads; drives backoff. Reset when an upload completes.
+  private _attempts = 0;
+  // Consecutive backend retryable_error results for one transaction; drives the retry limit.
+  private _limitKey: string | null = null;
+  private _limitCount = 0;
 
   constructor() {
     let userId = localStorage.getItem(USER_ID_STORAGE_KEY);
@@ -112,18 +123,25 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
     return 'retain';
   }
 
+  /** Backoff and retry-limit settings. Override to tune them. */
+  protected getRetryConfig(): RetryConfig {
+    return DEFAULT_RETRY_CONFIG;
+  }
+
   /**
-   * Handles a backend `retryable_error` result. Waits for retryAfterMs, if supplied,
-   * then throws so PowerSync retains the transaction and retries the upload.
+   * Handles a backend `retryable_error` result. Backs off exponentially (retryAfterMs, if supplied,
+   * is the minimum), then throws so PowerSync retains the transaction and retries the upload.
    * Overrides must also throw to keep the transaction queued.
    */
   protected async onRetryableError(result: Extract<TransactionResult, { status: 'retryable_error' }>): Promise<never> {
-    await sleep(result.retryAfterMs ?? 0);
+    this._attempts += 1;
+    await sleep(backoffDelayMs(this._attempts, this.getRetryConfig(), result.retryAfterMs));
     throw new Error(result.message ?? 'Retryable error');
   }
 
   /**
-   * Handles network errors, timeouts, and non-2xx responses through {@link onRetryableError}.
+   * Handles network errors, timeouts, and non-2xx responses through {@link onRetryableError}, so they
+   * back off but do not count toward the retry limit.
    * Clears the cached token on {@link AuthenticationError} so the next upload fetches a new one.
    * Override to handle transport failures separately from backend retryable results.
    */
@@ -134,6 +152,38 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
 
     const message = error instanceof Error ? error.message : String(error);
     return this.onRetryableError({ status: 'retryable_error', message });
+  }
+
+  /**
+   * Replaces the first non-successful result with a client-handled `RETRY_LIMIT_EXCEEDED` fatal
+   * result once its transaction has received `maxAttempts` consecutive `retryable_error` results. The
+   * backend retries any database error it does not recognize as permanent, so this stops a poison
+   * transaction from blocking the queue forever. It is handled by {@link onFatalTransaction};
+   * retaining restarts the count.
+   */
+  private applyRetryLimit(batch: CrudTransaction[], results: TransactionResult[]): TransactionResult[] {
+    if (!Array.isArray(results) || results.length !== batch.length) return results;
+    const index = results.findIndex((r) => r?.status !== 'success');
+    const result = results[index];
+    if (result?.status !== 'retryable_error') {
+      this._limitKey = null;
+      return results;
+    }
+    const key = String(batch[index].transactionId ?? batch[index].crud[0]?.clientId);
+    this._limitCount = key === this._limitKey ? this._limitCount + 1 : 1;
+    this._limitKey = key;
+    if (this._limitCount < this.getRetryConfig().maxAttempts) return results;
+    this._limitCount = 0;
+    const exceeded: TransactionResult = {
+      status: 'fatal_error',
+      message: result.message,
+      requiresClientHandling: true,
+      failedOperation: {
+        error_code: 'RETRY_LIMIT_EXCEEDED',
+        message: result.message
+      }
+    };
+    return results.map((r, i) => (i === index ? exceeded : r));
   }
 
   private async uploadTransactionBatch(database: AbstractPowerSyncDatabase, batching: BatchingConfig): Promise<void> {
@@ -166,9 +216,11 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
 
     await completeAcceptedPrefix(
       batch,
-      results,
+      this.applyRetryLimit(batch, results),
       (index, result) => this.onFatalTransaction(batch[index], result),
       (result) => this.onRetryableError(result)
     );
+    this._attempts = 0;
+    this._limitKey = null;
   }
 }
