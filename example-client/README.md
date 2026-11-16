@@ -1,8 +1,11 @@
 # Example client
 
-Copy one of these TypeScript client connectors into your PowerSync app. This directory
-has no package manifest or runnable UI. Each client connector sends local transactions to the write API; the
-PowerSync SDK handles the separate sync connection.
+Copy one of these TypeScript client connectors into your PowerSync app. This directory has no
+runnable UI; its `package.json` only type-checks the connectors (`pnpm check`). Each client
+connector sends local transactions to the write API; the PowerSync SDK handles the separate sync
+connection.
+
+The connectors need `@powersync/web` 2.6.0 or `@powersync/react-native` 2.4.0 or later.
 
 ## Choose a client connector
 
@@ -28,7 +31,7 @@ The modular client connector reads these variables through `import.meta.env`. Ad
 | Variable | Meaning |
 | --- | --- |
 | `VITE_BACKEND_URL` | Write API base URL without a trailing slash, e.g. `http://localhost:6060` |
-| `VITE_POWERSYNC_URL` | Your PowerSync instance URL |
+| `VITE_POWERSYNC_URL` | Your PowerSync instance URL, passed to `connect()` |
 | `VITE_POWERSYNC_TOKEN` | Demo token for sync and writes; replace `fetchAuthToken()` in real apps |
 | `VITE_BATCH_MAX_TRANSACTIONS` | Transactions per request; use 1–50 (default 1) |
 | `VITE_BATCH_MAX_OPERATIONS` | Operation threshold for collecting transactions (default 1000) |
@@ -40,37 +43,105 @@ uploads one transaction per request. The write API rejects batches larger than 5
 by the last transaction collected because the connector does not split transactions.
 
 The single-file client connector uses constants at the top instead of environment variables.
-Set its URLs, batch thresholds, and timeout there.
+Set its write API URL, batch thresholds, and timeout there.
 
-After adapting authentication, connect your initialized PowerSync database:
+Connect your initialized PowerSync database with an `Authenticator` and the connector's `upload`
+callback. This demo authenticator returns the fixed `VITE_POWERSYNC_TOKEN`:
 
 ```ts
+import type { Authenticator } from '@powersync/web';
 import { PowersyncConnector } from './PowersyncConnector';
+import { readDemoConfig } from './library/powersync/DemoConnectorConfig';
 
-await db.connect(new PowersyncConnector());
+const config = readDemoConfig();
+
+// Replace with your auth provider's token retrieval.
+async function fetchAuthToken(): Promise<string> {
+  if (!config.authToken) {
+    throw new Error('No auth token. Set VITE_POWERSYNC_TOKEN or replace fetchAuthToken().');
+  }
+  return config.authToken;
+}
+
+let cachedToken: string | null = null;
+
+const authenticator: Authenticator = {
+  async resolveCredentials() {
+    cachedToken ??= await fetchAuthToken();
+    return cachedToken;
+  },
+  // Called after PowerSync or the write API rejects the token, and before it expires.
+  invalidateCredentials() {
+    cachedToken = null;
+  }
+};
+
+const connector = new PowersyncConnector({ authenticator });
+await db.connect({ powerSyncEndpoint: config.powersyncUrl, authenticator, upload: connector.upload });
 ```
 
-`db` is your existing PowerSync database instance. For the single-file version, change the
-import path. `fetchCredentials()` supplies the sync token; `uploadData()` sends writes.
+`db` is your existing PowerSync database instance. The authenticator supplies the token for sync,
+and the connector uses it for writes. For the single-file version, change the import path and
+pass your PowerSync instance URL as `powerSyncEndpoint`.
+
+## Migrating from a Backend Connector
+
+If your app connects with a `PowerSyncBackendConnector`, move its `fetchCredentials()` into an
+`Authenticator` and replace its `uploadData()` with the connector's `upload` callback. An app
+can't pass both a backend connector and an `upload` callback to `connect()`.
+
+Before:
+
+```ts
+class MyConnector implements PowerSyncBackendConnector {
+  async fetchCredentials() {
+    return { endpoint: POWERSYNC_URL, token: await fetchAuthToken() };
+  }
+
+  async uploadData(database: CommonPowerSyncDatabase) {
+    // ...
+  }
+}
+
+await db.connect(new MyConnector());
+```
+
+After:
+
+```ts
+const authenticator: Authenticator = {
+  async resolveCredentials() {
+    return fetchAuthToken();
+  }
+};
+
+const connector = new PowersyncConnector({ authenticator });
+await db.connect({ powerSyncEndpoint: POWERSYNC_URL, authenticator, upload: connector.upload });
+```
+
+The SDK isn't guaranteed to cache tokens from an `Authenticator`. Cache the token in
+`resolveCredentials()` and clear the cache in `invalidateCredentials()`, as in the demo above. `resolveCredentials()` returns only the token,
+so drop any `expiresAt`.
 
 ## Authentication
 
 Neither backend issues tokens. Configure the Express backend to trust your token provider,
 or use Supabase Auth with the Supabase Edge Function. Your PowerSync instance must trust
-the tokens used for sync. The demo `fetchAuthToken()` returns a fixed token (`VITE_POWERSYNC_TOKEN`, or
-`AUTH_TOKEN` in the single-file connector), such as a session token copied from your provider.
-Both sync and writes reuse it.
+the tokens used for sync. The demo authenticator returns a fixed token, such as a session token
+copied from your provider. Both sync and writes use it.
 
-For a provider integration, edit the private `fetchAuthToken()` method in your copied connector.
-See [Supabase and Clerk](../docs/auth/providers.md). If using different tokens for sync and writes,
-also adapt `fetchCredentials()`, keeping the same user ID in both tokens.
+The connector takes write tokens from the authenticator you pass it. Each write request calls
+`resolveCredentials()`. After a 401 or 403 write response, the connector calls
+`invalidateCredentials()` and the upload is retried. For a provider integration, replace the demo
+authenticator; see [Supabase and Clerk](../docs/auth/providers.md). If writes need a different
+token from sync, pass the connector a second authenticator, keeping the same user ID in both tokens.
+
+Cache the token in your authenticator even if your provider SDK refreshes sessions itself, and
+clear the cache in `invalidateCredentials()`. The next `resolveCredentials()` call then gets the
+provider's current token. For Supabase, see
+[Using Supabase Auth in the connector](../backend/supabase/README.md#using-supabase-auth-in-the-connector).
 
 The modular transport's token callback is `getAuthToken`; its timeout option is `timeoutMs`.
-The demo clears its cached token after a 401/403 write response. Provider SDKs should manage
-provider sessions without the demo cache. If your provider SDK refreshes sessions itself, remove
-the cache in `getAuthToken()` and read the session on each call; otherwise sync keeps using an
-expired token. For Supabase, see
-[Using Supabase Auth in the connector](../backend/supabase/README.md#using-supabase-auth-in-the-connector).
 
 ## Rejected writes
 

@@ -26,25 +26,26 @@ Preserve the modular client connector's runtime behavior and follow these requir
    this API need a polyfill or their own UUID generator.
 5. Define API types from the current OpenAPI contract, including discriminated result
    unions and application-defined error codes. Preserve the contract's type constraints.
-6. Throw `AuthenticationError` for 401/403 responses so the connector clears its cached
-   token. Preserve error-message parsing and fallback handling for other failures.
+6. Throw `AuthenticationError` for 401/403 responses so the connector calls the
+   authenticator's `invalidateCredentials()`. Preserve error-message parsing and fallback handling for other failures.
 7. Keep `AppSchema.ts` separate from the connector.
 8. Implement transport as a private connector method. Do not add a transport injection layer.
 9. Omit the unused `clientId` request option and the modular `_writeClient` cache.
    The single-file client connector calls its own transport method. Preserve any future
    behavior that depends on the client ID.
-10. Keep a concise header covering dependencies, editable constants, demo token setup,
+10. Keep a concise header covering dependencies, editable constants, `connect()` wiring,
     write API verification, PowerSync JWKS configuration, and identity-provider integration.
     Include the setup links because users may copy the file without its README.
-11. Preserve the methods and override points: `uploadData`, `fetchCredentials`,
-    `getBatchingConfig`, `onFatalTransaction`, `onRetryableError`, and `onTransportError`.
+11. Preserve the API and override points: the `{ authenticator }` constructor option, the
+    `upload` callback, `getBatchingConfig`, `onFatalTransaction`, `onRetryableError`, and
+    `onTransportError`. Take write tokens from `authenticator.resolveCredentials()`.
     Keep shared behavior documented consistently in both connector versions.
 
 Write comments that explain behavior, configuration, or constraints. Avoid repeated
 reassurances, all-caps warnings, metaphors, and accounts of earlier design proposals.
 
 Update the example-client README if the file layout changes. The example client remains
-reference code without its own package manifest, build step, or test suite.
+reference code without a build step or test suite; its `package.json` only type-checks it.
 
 ## Fatal-error handling
 

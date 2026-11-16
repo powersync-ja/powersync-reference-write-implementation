@@ -1,15 +1,15 @@
 # PowerSync Reference Write Implementation
 
 When your PowerSync app writes data using SQL INSERT, UPDATE, or DELETE statements,
-PowerSync automatically queues these mutations for processing using the `uploadData` function.
+PowerSync automatically queues these mutations and passes them to the upload callback you give `connect()`.
 
-While there are no restrictions on the implementation of `uploadData` and the related write API,
+While there are no restrictions on the implementation of the upload callback and the related write API,
 this repository provides a client connector and two implementations of the write API for most simple use cases.
 It provides extension points that will allow you to customize
 the behavior to your own requirements, or you can modify it to suit your specific case.
 
 - [backend/shared/powersync-reference-write-api.openapi.yaml](backend/shared/powersync-reference-write-api.openapi.yaml) provides a simple but flexible API definition that serves as a contract between the client connector and either backend.
-- A [client connector](example-client/src/PowersyncConnector.ts) implementing `uploadData` handles most common workflows. It will marshal queued changes to the format specified by the API definition. A [single-file client connector](example-client/src/PowersyncConnector.singlefile.ts) is provided for ease of copy-paste.
+- A [client connector](example-client/src/PowersyncConnector.ts) providing the upload callback handles most common workflows. It will marshal queued changes to the format specified by the API definition. A [single-file client connector](example-client/src/PowersyncConnector.singlefile.ts) is provided for ease of copy-paste.
 - The write API (`POST /api/data`) accepts queued transactions from the client connector and applies them to your source database. Choose the [standalone Express backend](backend/standalone/README.md), or, for Supabase apps, the [Supabase Edge Function](backend/supabase/README.md), which implements the same write API and enforces your existing RLS policies. Both use the [shared core](backend/shared), which contains the transaction processor and adapters for Postgres, MongoDB, MySQL, and SQL Server.
 
 The green blocks are provided by this repository; click them to explore the code. Solid arrows
@@ -20,7 +20,7 @@ Choose one backend to serve the write API (`POST /api/data`).
 flowchart TB
     subgraph app["Your app"]
         sdk["PowerSync SDK<br/>Local database and upload queue"]
-        connector["Client connector<br/>uploadData()"]
+        connector["Client connector<br/>upload"]
         sdk -->|Queued local writes| connector
     end
 
@@ -120,12 +120,22 @@ Startup checks the database type, connection string, fatal-error policy, and ver
 
 ### 4. Connect your app
 
-Copy a client connector from [example-client](example-client/README.md) into your app. Configure
-its write API URL, PowerSync instance URL, and token retrieval, then pass it to your existing
-PowerSync database's `connect()` method. The client connector implements:
+Copy a client connector from [example-client](example-client/README.md) into your app and set its
+write API URL. Then pass its `upload` callback to `connect()`, together with an `Authenticator`:
 
-- `fetchCredentials()`: credentials for the PowerSync sync connection. If your app is already reading data from PowerSync then you will have already implemented this function, we recommend that you keep your existing implementation and configure the Express backend to trust the same issuers - see [auth setup](docs/auth/setup.md).
-- `uploadData()`: sends queued local transactions to `POST /api/data`.
+```ts
+const connector = new PowersyncConnector({ authenticator });
+await db.connect({ powerSyncEndpoint, authenticator, upload: connector.upload });
+```
+
+- `authenticator`: supplies tokens for the PowerSync sync connection, and the connector uses it for
+  write requests too. If your app already syncs with PowerSync, keep your existing authentication and
+  configure the Express backend to trust the same issuers; see [auth setup](docs/auth/setup.md).
+- `upload`: sends queued local transactions to `POST /api/data`.
+
+This needs `@powersync/web` 2.6.0 or `@powersync/react-native` 2.4.0 or later. If your app connects
+with a `PowerSyncBackendConnector`, see
+[migrating from a backend connector](example-client/README.md#migrating-from-a-backend-connector).
 
 Use a URL reachable from the client device. `localhost` refers to that device, so another
 computer or phone needs the Express backend's network address or a tunnel URL.

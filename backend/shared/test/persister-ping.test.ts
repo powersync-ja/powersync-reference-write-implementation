@@ -40,7 +40,8 @@ vi.mock('mongodb', () => ({
   MongoClient: class {
     async connect() {}
     db() {
-      return { command: db.mongoCommand };
+      // createMongoPersister discovers collection validators at startup.
+      return { command: db.mongoCommand, listCollections: () => ({ toArray: async () => [] }) };
     }
   }
 }));

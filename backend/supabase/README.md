@@ -64,7 +64,7 @@ create policy "Owners manage their lists" on public.lists
 > A write that a policy or missing grant denies returns `retryable_error` for the whole
 > transaction. The client connector keeps it queued and retries, so a mistake in a policy or grant does not
 > lose user writes, but it blocks that user's later uploads until the write succeeds. Have your
-> client connector's `uploadData` give up after a number of retries and dead-letter or discard the
+> client connector give up after a number of retries and dead-letter or discard the
 > transaction. The Express backend instead returns a fatal `UNAUTHORIZED` that stays queued; see
 > [error handling](../../docs/error-handling.md).
 >
@@ -141,40 +141,40 @@ Supabase Auth tokens; see PowerSync's
 
 ### Using Supabase Auth in the connector
 
-Pass your app's supabase-js client to the copied connector and read the session on every call.
-Do not keep the connector's token cache: supabase-js refreshes the session itself, and the cache
-is cleared only after a rejected write, so sync would keep receiving an expired token. In
-`PowersyncConnector.ts`, replace `fetchCredentials()`, `fetchAuthToken()`, and `getAuthToken()`:
+Use an `Authenticator` that reads the access token from your app's supabase-js client, and pass it
+to both `connect()` and the connector. The SDK isn't guaranteed to cache tokens, so cache the token
+and clear the cache in `invalidateCredentials()`. PowerSync calls `invalidateCredentials()` 30
+seconds before the token expires, and the connector calls it when the write API rejects the token.
+The next `getSession()` call then returns a valid session: in current supabase-js versions, it
+refreshes the session when it expires within 90 seconds.
 
 ```ts
-constructor(private readonly supabase: SupabaseClient) {
-  // existing setup
-}
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Authenticator } from '@powersync/web';
 
-async fetchCredentials() {
-  const session = await this.getSession();
-  return {
-    endpoint: this.config.powersyncUrl,
-    token: session.access_token,
-    expiresAt: session.expires_at ? new Date(session.expires_at * 1000) : undefined
-  };
-}
+declare const supabase: SupabaseClient; // your app's client
 
-private async getSession() {
-  const { data: { session }, error } = await this.supabase.auth.getSession();
-  if (!session || error) throw new Error('Not signed in to Supabase');
-  return session;
-}
+let cachedToken: string | null = null;
 
-// Write requests call this through the transport.
-private async getAuthToken(): Promise<string> {
-  return (await this.getSession()).access_token;
-}
+const authenticator: Authenticator = {
+  async resolveCredentials() {
+    if (!cachedToken) {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (!session || error) throw new Error('Not signed in to Supabase');
+      cachedToken = session.access_token;
+    }
+    return cachedToken;
+  },
+  invalidateCredentials() {
+    cachedToken = null;
+  }
+};
+
+const connector = new PowersyncConnector({ authenticator });
+await db.connect({ powerSyncEndpoint, authenticator, upload: connector.upload });
 ```
 
-The single-file connector has the same methods; use `POWERSYNC_URL` instead of
-`this.config.powersyncUrl`. Remove the now-unused `_authToken` field, including its reset in
-`onTransportError()`. Uploads, batching, and error handling are unchanged.
+Uploads, batching, and error handling are unchanged.
 
 ## Customize
 

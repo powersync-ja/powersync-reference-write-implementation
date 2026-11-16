@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
 
-// Requires @powersync/web or @powersync/react-native >=1.26.0 for getCrudTransactions().
-import type { AbstractPowerSyncDatabase, CrudTransaction, PowerSyncBackendConnector } from '@powersync/web';
+// Requires @powersync/web >=2.6.0 or @powersync/react-native >=2.4.0 for Authenticator and MutationUploader.
+import type { Authenticator, CommonPowerSyncDatabase, CrudTransaction, MutationUploader } from '@powersync/web';
 import {
   WriteAPIClient,
   type TransactionResult,
@@ -17,31 +17,33 @@ import {
 } from './library/powersync/DemoConnectorConfig';
 import { completeAcceptedPrefix, sleep } from './library/powersync/TransactionBatching';
 
-export class PowersyncConnector implements PowerSyncBackendConnector {
+/**
+ * Uploads queued local changes to the write API. Pass {@link upload} to `connect()`:
+ *
+ *   db.connect({ powerSyncEndpoint, authenticator, upload: new PowersyncConnector({ authenticator }).upload });
+ */
+export class PowersyncConnector {
   // Called by PowerSync to upload queued local changes to the write API.
-  async uploadData(database: AbstractPowerSyncDatabase): Promise<void> {
+  readonly upload: MutationUploader = ({ database }) => {
     const batching = this.getBatchingConfig();
     return this.uploadTransactionBatch(database, batching);
-  }
-
-  // Returns credentials for the PowerSync sync connection, reusing the write API token.
-  // The write API accepts tokens your PowerSync instance trusts. See docs/auth/providers.md.
-  async fetchCredentials() {
-    return {
-      endpoint: this.config.powersyncUrl,
-      token: await this.getAuthToken()
-    };
-  }
+  };
 
   readonly config: DemoConfig;
   readonly userId: string;
   readonly apiClient: OpenAPIClient;
 
+  private readonly authenticator: Authenticator;
   private _clientId: string | null;
   private _writeClient: WriteAPIClient | null;
-  private _authToken: string | null;
 
-  constructor() {
+  /**
+   * @param authenticator Supplies the bearer token for write API requests. Pass the authenticator you
+   * use for sync, or a separate one if writes need a different token. The write API accepts tokens
+   * your PowerSync instance trusts. See docs/auth/providers.md.
+   */
+  constructor({ authenticator }: { authenticator: Authenticator }) {
+    this.authenticator = authenticator;
     let userId = localStorage.getItem(USER_ID_STORAGE_KEY);
     if (!userId) {
       userId = uuid();
@@ -50,34 +52,13 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
     this.userId = userId;
     this._clientId = null;
     this._writeClient = null;
-    this._authToken = null;
 
     this.config = readDemoConfig();
 
     this.apiClient = createOpenAPIClient(this.config.backendUrl, {
       timeoutMs: this.config.requestTimeoutMs,
-      getAuthToken: () => this.getAuthToken()
+      getAuthToken: () => this.authenticator.resolveCredentials({})
     });
-  }
-
-  // Replace with your auth provider's session token (e.g. Supabase `session.access_token`).
-  // The demo reads a fixed token from VITE_POWERSYNC_TOKEN.
-  private async fetchAuthToken(): Promise<string> {
-    if (!this.config.authToken) {
-      throw new Error('No auth token. Set VITE_POWERSYNC_TOKEN or replace fetchAuthToken().');
-    }
-    return this.config.authToken;
-  }
-
-  /**
-   * Returns the cached token shared by sync and write requests.
-   * Fetches a token on first use or after {@link onTransportError} clears the cache.
-   */
-  private async getAuthToken(): Promise<string> {
-    if (!this._authToken) {
-      this._authToken = await this.fetchAuthToken();
-    }
-    return this._authToken;
   }
 
   /**
@@ -88,7 +69,7 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
     return this.config.batching || DEFAULT_BATCHING_CONFIG;
   }
 
-  private async getWriteClient(database: AbstractPowerSyncDatabase): Promise<WriteAPIClient> {
+  private async getWriteClient(database: CommonPowerSyncDatabase): Promise<WriteAPIClient> {
     if (!this._writeClient) {
       this._writeClient = new WriteAPIClient({
         transport: this.apiClient.transport,
@@ -124,19 +105,20 @@ export class PowersyncConnector implements PowerSyncBackendConnector {
 
   /**
    * Handles network errors, timeouts, and non-2xx responses through {@link onRetryableError}.
-   * Clears the cached token on {@link AuthenticationError} so the next upload fetches a new one.
-   * Override to handle transport failures separately from write API retryable results.
+   * On {@link AuthenticationError}, calls the authenticator's `invalidateCredentials()` so the next
+   * upload gets a new token. Override to handle transport failures separately from write API
+   * retryable results.
    */
   protected async onTransportError(error: unknown): Promise<never> {
     if (error instanceof AuthenticationError) {
-      this._authToken = null;
+      this.authenticator.invalidateCredentials?.();
     }
 
     const message = error instanceof Error ? error.message : String(error);
     return this.onRetryableError({ status: 'retryable_error', message });
   }
 
-  private async uploadTransactionBatch(database: AbstractPowerSyncDatabase, batching: BatchingConfig): Promise<void> {
+  private async uploadTransactionBatch(database: CommonPowerSyncDatabase, batching: BatchingConfig): Promise<void> {
     const batch: CrudTransaction[] = [];
     let operations = 0;
 
