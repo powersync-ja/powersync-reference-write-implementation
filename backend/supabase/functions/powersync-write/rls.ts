@@ -22,6 +22,7 @@ export async function asAuthenticatedUser(client: PG.PoolClient, auth: AuthConte
  */
 export function permissionErrorsRetryable(persister: Persister): Persister {
   return {
+    ping: () => persister.ping(),
     async updateBatch(batch, auth) {
       try {
         await persister.updateBatch(batch, auth);
