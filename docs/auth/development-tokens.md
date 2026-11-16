@@ -31,5 +31,5 @@ Restart the Express backend after changing these.
 
 ## 3. Use the token
 
-In your copy of the connector, return the token from the private `fetchAuthToken()` method.
-Both `fetchCredentials()` (sync) and writes use it.
+Return the token from `fetchAuthToken()` in the demo authenticator; see the
+[example client](../../example-client/README.md#configure-and-connect). Both sync and writes use it.

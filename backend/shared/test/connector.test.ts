@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('uuid', () => ({ v4: () => 'test-user' }));
 vi.mock('../../../example-client/src/library/powersync/OpenAPITransport', () => ({
-  AuthenticationError: class extends Error {},
+  AuthenticationError: class AuthenticationError extends Error {},
   createOpenAPIClient: () => ({ transport: {} })
 }));
 vi.mock('../../../example-client/src/library/powersync/DemoConnectorConfig', () => ({
@@ -20,8 +20,21 @@ const splitPath = '../../../example-client/src/PowersyncConnector.ts';
 const singlePath = '../../../example-client/src/PowersyncConnector.singlefile.ts';
 const { PowersyncConnector: Split } = await import(new URL(splitPath, import.meta.url).href);
 const { PowersyncConnector: Single } = await import(new URL(singlePath, import.meta.url).href);
+const { AuthenticationError } = await import(
+  new URL('../../../example-client/src/library/powersync/OpenAPITransport.ts', import.meta.url).href
+);
 
-beforeEach(() => vi.stubGlobal('localStorage', { getItem: () => 'user' }));
+function stubAuthenticator() {
+  return {
+    resolveCredentials: vi.fn(async () => 'token'),
+    invalidateCredentials: vi.fn()
+  };
+}
+
+beforeEach(() => {
+  vi.unstubAllGlobals();
+  vi.stubGlobal('localStorage', { getItem: () => 'user' });
+});
 
 for (const [name, Connector] of [
   ['split', Split],
@@ -29,7 +42,7 @@ for (const [name, Connector] of [
 ] as const) {
   describe(`${name} connector queue completion`, () => {
     async function upload(results: unknown[], decision: unknown = 'retain') {
-      const connector = new Connector();
+      const connector = new Connector({ authenticator: stubAuthenticator() });
       const hook = vi.fn(async () => {
         if (decision instanceof Error) throw decision;
         return decision;
@@ -65,7 +78,7 @@ for (const [name, Connector] of [
       };
       let error: unknown;
       try {
-        await connector.uploadData(database as any);
+        await connector.upload({ database: database as any });
       } catch (e) {
         error = e;
       }
@@ -131,3 +144,56 @@ for (const [name, Connector] of [
     });
   });
 }
+
+describe('write API authentication failure', () => {
+  const database = (complete = vi.fn(async () => {})) => ({
+    complete,
+    db: {
+      getClientId: async () => 'client',
+      async *getCrudTransactions() {
+        yield { crud: [{ id: '1', table: 'items', op: 'PUT' }], complete };
+      }
+    }
+  });
+
+  it.each([
+    [
+      'split',
+      (connector: any) =>
+        Object.assign(connector, {
+          getWriteClient: async () =>
+            new WriteAPIClient({
+              transport: {
+                postTransactionBatch: async () => {
+                  throw new AuthenticationError('Authentication failed (401)');
+                }
+              },
+              userId: 'user',
+              clientId: 'client'
+            })
+        }),
+      Split
+    ],
+    [
+      'single',
+      () =>
+        vi.stubGlobal(
+          'fetch',
+          vi.fn(async () => new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401 }))
+        ),
+      Single
+    ]
+  ] as const)(
+    '%s connector invalidates credentials on 401 and keeps the transaction queued',
+    async (_, stub, Connector) => {
+      const authenticator = stubAuthenticator();
+      const connector = new Connector({ authenticator });
+      stub(connector);
+      const { complete, db } = database();
+
+      await expect(connector.upload({ database: db as any })).rejects.toThrow();
+      expect(authenticator.invalidateCredentials).toHaveBeenCalledOnce();
+      expect(complete).not.toHaveBeenCalled();
+    }
+  );
+});

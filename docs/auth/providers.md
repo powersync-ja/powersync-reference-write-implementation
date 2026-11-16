@@ -3,10 +3,11 @@
 Express backend settings that are specific to these providers. For everything else, see
 [auth setup](setup.md).
 
-In the client connector you copied, return the provider's token from the private `fetchAuthToken()`
-method, which supplies both writes and `fetchCredentials()` (sync). Provider SDKs manage their
-own sessions, so you can drop the demo token cache in `getAuthToken()`. If sync and
-writes use different tokens, both must carry the same user ID in `sub`.
+In your app, replace the demo `Authenticator` from the [example client](../../example-client/README.md#configure-and-connect)
+with one whose `resolveCredentials()` returns the provider's token. The connector uses it for
+writes and PowerSync uses it for sync. Provider SDKs manage their own sessions, so you can drop the
+demo token cache. If sync and writes use different tokens, pass the connector its own
+authenticator. Both tokens must carry the same user ID in `sub`.
 
 ## Supabase
 
@@ -56,5 +57,6 @@ AUTH_AUTHORIZED_PARTIES=http://localhost:5173,https://yourapp.com
 check, any token from your Clerk instance would be valid. Tokens with a missing or unlisted
 `azp` are rejected, so apps whose tokens omit it need a custom verifier.
 
-In the connector, `getAuthToken()` returns `clerk.session.getToken()` for session tokens and
-`fetchCredentials()` returns `getToken({ template: '<name>' })`.
+With session tokens for writes, use two authenticators: pass `connect()` one whose
+`resolveCredentials()` returns `clerk.session.getToken({ template: '<name>' })`, and pass the
+connector one that returns `clerk.session.getToken()`.

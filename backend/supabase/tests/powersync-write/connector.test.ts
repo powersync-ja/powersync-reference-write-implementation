@@ -3,7 +3,7 @@ import { admin, applyTestSchema, FUNCTION_URL, listRow, signUp } from './helpers
 
 /**
  * Runs the unchanged single-file example connector against the function. Only its BACKEND_URL
- * and AUTH_TOKEN constants are replaced.
+ * constant is replaced. The user's Supabase session token comes from an Authenticator.
  */
 Deno.test({
   name: 'example connector uploads through the function URL',
@@ -14,8 +14,7 @@ Deno.test({
     const user = await signUp('connector');
     const source = await Deno.readTextFile(new URL('../../../../example-client/src/PowersyncConnector.singlefile.ts', import.meta.url));
     const configured = source
-      .replace(/^const BACKEND_URL = .*$/m, `const BACKEND_URL = ${JSON.stringify(FUNCTION_URL)};`)
-      .replace(/^const AUTH_TOKEN = .*$/m, `const AUTH_TOKEN = ${JSON.stringify(user.token)};`);
+      .replace(/^const BACKEND_URL = .*$/m, `const BACKEND_URL = ${JSON.stringify(FUNCTION_URL)};`);
     const path = await Deno.makeTempFile({ suffix: '.ts' });
     await Deno.writeTextFile(path, configured);
 
@@ -40,7 +39,8 @@ Deno.test({
     };
 
     try {
-      await new PowersyncConnector().uploadData(database);
+      const authenticator = { resolveCredentials: async () => user.token };
+      await new PowersyncConnector({ authenticator }).upload({ database });
       assertEquals(completed, 1);
       assertEquals(await listRow(list), { name: 'From connector', owner_id: user.id });
     } finally {
