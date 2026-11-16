@@ -119,9 +119,8 @@ const connector = new PowersyncConnector({ authenticator });
 await db.connect({ powerSyncEndpoint: POWERSYNC_URL, authenticator, upload: connector.upload });
 ```
 
-PowerSync caches the token from a backend connector but not from an `Authenticator`. If
-`fetchAuthToken()` makes a network request, cache its result and clear the cache in
-`invalidateCredentials()`, as in the demo above. `resolveCredentials()` returns only the token,
+The SDK isn't guaranteed to cache tokens from an `Authenticator`. Cache the token in
+`resolveCredentials()` and clear the cache in `invalidateCredentials()`, as in the demo above. `resolveCredentials()` returns only the token,
 so drop any `expiresAt`.
 
 ## Authentication
@@ -137,8 +136,9 @@ The connector takes write tokens from the authenticator you pass it. Each write 
 authenticator; see [Supabase and Clerk](../docs/auth/providers.md). If writes need a different
 token from sync, pass the connector a second authenticator, keeping the same user ID in both tokens.
 
-If your provider SDK refreshes sessions itself, return its current token from
-`resolveCredentials()` without a cache. For Supabase, see
+Cache the token in your authenticator even if your provider SDK refreshes sessions itself, and
+clear the cache in `invalidateCredentials()`. The next `resolveCredentials()` call then gets the
+provider's current token. For Supabase, see
 [Using Supabase Auth in the connector](../backend/supabase/README.md#using-supabase-auth-in-the-connector).
 
 The modular transport's token callback is `getAuthToken`; its timeout option is `timeoutMs`.

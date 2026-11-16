@@ -5,9 +5,9 @@ Express backend settings that are specific to these providers. For everything el
 
 In your app, replace the demo `Authenticator` from the [example client](../../example-client/README.md#configure-and-connect)
 with one whose `resolveCredentials()` returns the provider's token. The connector uses it for
-writes and PowerSync uses it for sync. Provider SDKs manage their own sessions, so you can drop the
-demo token cache. If sync and writes use different tokens, pass the connector its own
-authenticator. Both tokens must carry the same user ID in `sub`.
+writes and PowerSync uses it for sync. Keep the demo's token cache, which `invalidateCredentials()`
+clears: the SDK isn't guaranteed to cache tokens. If sync and writes use different tokens, pass the
+connector its own authenticator. Both tokens must carry the same user ID in `sub`.
 
 ## Supabase
 
@@ -59,4 +59,4 @@ check, any token from your Clerk instance would be valid. Tokens with a missing 
 
 With session tokens for writes, use two authenticators: pass `connect()` one whose
 `resolveCredentials()` returns `clerk.session.getToken({ template: '<name>' })`, and pass the
-connector one that returns `clerk.session.getToken()`.
+connector one that returns `clerk.session.getToken()`. Give each its own token cache.

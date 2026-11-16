@@ -141,10 +141,12 @@ Supabase Auth tokens; see PowerSync's
 
 ### Using Supabase Auth in the connector
 
-Use an `Authenticator` that reads the session from your app's supabase-js client on every call,
-and pass it to both `connect()` and the connector. Don't cache the token: supabase-js refreshes the
-session itself. In current supabase-js versions, `getSession()` refreshes the session when it
-expires within 90 seconds. PowerSync asks for a new token 30 seconds before expiry, so it always gets a valid one.
+Use an `Authenticator` that reads the access token from your app's supabase-js client, and pass it
+to both `connect()` and the connector. The SDK isn't guaranteed to cache tokens, so cache the token
+and clear the cache in `invalidateCredentials()`. PowerSync calls `invalidateCredentials()` 30
+seconds before the token expires, and the connector calls it when the write API rejects the token.
+The next `getSession()` call then returns a valid session: in current supabase-js versions, it
+refreshes the session when it expires within 90 seconds.
 
 ```ts
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -152,11 +154,19 @@ import type { Authenticator } from '@powersync/web';
 
 declare const supabase: SupabaseClient; // your app's client
 
+let cachedToken: string | null = null;
+
 const authenticator: Authenticator = {
   async resolveCredentials() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (!session || error) throw new Error('Not signed in to Supabase');
-    return session.access_token;
+    if (!cachedToken) {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (!session || error) throw new Error('Not signed in to Supabase');
+      cachedToken = session.access_token;
+    }
+    return cachedToken;
+  },
+  invalidateCredentials() {
+    cachedToken = null;
   }
 };
 
